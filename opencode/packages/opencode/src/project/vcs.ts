@@ -278,6 +278,31 @@ export class PatchApplyError extends Schema.TaggedErrorClass<PatchApplyError>()(
   reason: Schema.Literals(["non-git", "not-clean"]),
 }) {}
 
+export const CommitInput = Schema.Struct({
+  message: Schema.String.check(Schema.isPattern(/\S/)),
+})
+export type CommitInput = Schema.Schema.Type<typeof CommitInput>
+
+export const CommitResult = Schema.Struct({
+  committed: Schema.Literal(true),
+  hash: Schema.String,
+  branch: Schema.String,
+})
+export type CommitResult = Schema.Schema.Type<typeof CommitResult>
+
+export const PushResult = Schema.Struct({
+  pushed: Schema.Literal(true),
+  branch: Schema.String,
+  remote: Schema.String,
+})
+export type PushResult = Schema.Schema.Type<typeof PushResult>
+
+export class OperationError extends Schema.TaggedErrorClass<OperationError>()("VcsOperationError", {
+  message: Schema.String,
+  action: Schema.Literals(["commit", "push"]),
+  reason: Schema.Literals(["non-git", "nothing-to-commit", "no-remote", "failed"]),
+}) {}
+
 export interface Interface {
   readonly init: () => Effect.Effect<void>
   readonly branch: () => Effect.Effect<string | undefined>
@@ -286,6 +311,8 @@ export interface Interface {
   readonly diff: (mode: Mode, options?: DiffOptions) => Effect.Effect<FileDiff[]>
   readonly diffRaw: () => Effect.Effect<string>
   readonly apply: (input: ApplyInput) => Effect.Effect<ApplyResult, PatchApplyError>
+  readonly commit: (input: CommitInput) => Effect.Effect<CommitResult, OperationError>
+  readonly push: () => Effect.Effect<PushResult, OperationError>
 }
 
 interface State {
@@ -413,6 +440,93 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
           })
         }
         return { applied: true }
+      }),
+      commit: Effect.fn("Vcs.commit")(function* (input: CommitInput) {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") {
+          return yield* new OperationError({
+            message: "Commit can't be created because the project is not git-based",
+            action: "commit",
+            reason: "non-git",
+          })
+        }
+
+        const status = yield* git.status(ctx.directory)
+        if (status.length === 0) {
+          return yield* new OperationError({
+            message: "There are no changes to commit",
+            action: "commit",
+            reason: "nothing-to-commit",
+          })
+        }
+
+        const staged = yield* git.run(["add", "-A"], { cwd: ctx.directory })
+        if (staged.exitCode !== 0) {
+          return yield* new OperationError({
+            message: "Git could not stage the changes",
+            action: "commit",
+            reason: "failed",
+          })
+        }
+
+        const committed = yield* git.run(["commit", "-m", input.message.trim()], { cwd: ctx.directory })
+        if (committed.exitCode !== 0) {
+          return yield* new OperationError({
+            message: "Git could not create the commit",
+            action: "commit",
+            reason: "failed",
+          })
+        }
+
+        const hash = yield* git.run(["rev-parse", "--short", "HEAD"], { cwd: ctx.directory })
+        return {
+          committed: true,
+          hash: hash.text().trim(),
+          branch: (yield* git.branch(ctx.directory)) ?? "",
+        }
+      }),
+      push: Effect.fn("Vcs.push")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") {
+          return yield* new OperationError({
+            message: "Push can't run because the project is not git-based",
+            action: "push",
+            reason: "non-git",
+          })
+        }
+
+        const remotes = (yield* git.run(["remote"], { cwd: ctx.directory })).text().split(/\r?\n/).filter(Boolean)
+        const remote = remotes.includes("origin") ? "origin" : remotes[0]
+        if (!remote) {
+          return yield* new OperationError({
+            message: "No Git remote is configured",
+            action: "push",
+            reason: "no-remote",
+          })
+        }
+
+        const branch = yield* git.branch(ctx.directory)
+        if (!branch) {
+          return yield* new OperationError({
+            message: "Git push requires a checked out branch",
+            action: "push",
+            reason: "failed",
+          })
+        }
+
+        const pushed = yield* git.run(["push", "--set-upstream", remote, branch], {
+          cwd: ctx.directory,
+          maxOutputBytes: 32_768,
+        })
+        if (pushed.exitCode !== 0) {
+          return yield* new OperationError({
+            message: "Git push failed",
+            action: "push",
+            reason: "failed",
+          })
+        }
+
+        return { pushed: true, branch, remote }
       }),
     })
   }),

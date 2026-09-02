@@ -9,7 +9,7 @@ import { Skill } from "@/skill"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ApiVcsApplyError } from "../groups/instance"
+import { ApiVcsApplyError, ApiVcsOperationError } from "../groups/instance"
 import { markInstanceForDisposal } from "../lifecycle"
 
 export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance", (handlers) =>
@@ -73,6 +73,38 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       )
     })
 
+    const commitVcs = Effect.fn("InstanceHttpApi.vcsCommit")(function* (ctx: { payload: Vcs.CommitInput }) {
+      return yield* vcs.commit(ctx.payload).pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: {
+                message: error.message,
+                action: error.action,
+                reason: error.reason,
+              },
+            }),
+        ),
+      )
+    })
+
+    const pushVcs = Effect.fn("InstanceHttpApi.vcsPush")(function* () {
+      return yield* vcs.push().pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: {
+                message: error.message,
+                action: error.action,
+                reason: error.reason,
+              },
+            }),
+        ),
+      )
+    })
+
     const getCommand = Effect.fn("InstanceHttpApi.command")(function* () {
       return yield* command.list()
     })
@@ -101,6 +133,8 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("vcsDiff", getVcsDiff)
       .handle("vcsDiffRaw", getVcsDiffRaw)
       .handle("vcsApply", applyVcs)
+      .handle("vcsCommit", commitVcs)
+      .handle("vcsPush", pushVcs)
       .handle("command", getCommand)
       .handle("agent", getAgent)
       .handle("skill", getSkill)

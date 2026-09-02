@@ -16,6 +16,7 @@ import { HEADER as FenceHeader } from "../../src/server/shared/fence"
 import { resetDatabase } from "../fixture/db"
 import { tmpdirScoped } from "../fixture/fixture"
 import { testEffect } from "../lib/effect"
+import { requestInDirectory } from "./httpapi-layer"
 
 // Flip the experimental workspaces flag so EventV2.run actually writes to
 // EventSequenceTable (the source of truth the fence middleware reads). Reset
@@ -260,6 +261,37 @@ describe("instance HttpApi", () => {
       expect(yield* diff.json).toContainEqual(
         expect.objectContaining({ file: "changed.txt", additions: 1, status: "added" }),
       )
+    }),
+  )
+
+  it.live("serves VCS commit and push endpoints", () =>
+    Effect.gen(function* () {
+      const dir = yield* tmpdirScoped({ git: true })
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      yield* fs.writeFileString(path.join(dir, "commit.txt"), "committed")
+
+      const commit = yield* requestInDirectory(InstancePaths.vcsCommit, dir, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: "commit from API" }),
+      })
+      expect(commit.status).toBe(200)
+      expect(yield* commit.json).toMatchObject({
+        committed: true,
+        branch: expect.any(String),
+        hash: expect.any(String),
+      })
+
+      const push = yield* requestInDirectory(InstancePaths.vcsPush, dir, { method: "POST" })
+      expect(push.status).toBe(400)
+      expect(yield* push.json).toMatchObject({
+        name: "VcsOperationError",
+        data: {
+          action: "push",
+          reason: "no-remote",
+        },
+      })
     }),
   )
 })

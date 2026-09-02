@@ -29,15 +29,13 @@ Sory Code en cours.
 - Le dépôt OpenCode officiel est utilisé directement, sans créer de projet ou
   de chat parallèle.
 - Le plan d’adaptation est enregistré dans `PLAN-SORY-CODE.md`.
-- Le workflow Replit `Start OpenCode` a été configuré pour lancer le serveur
-  depuis le dossier `opencode` sur `0.0.0.0:5000`.
 - Python 3.11 a été ajouté à l’environnement Replit, car une dépendance native
   `tree-sitter-powershell` en a besoin pour `node-gyp`.
 - Les liens de dépendances Bun du monorepo ont été reconstruits avec
   `bun install --force --filter opencode --offline`.
-- L’intégration GitHub Replit est connectée. Les credentials doivent rester
-  gérés par Replit et ne doivent jamais être copiés dans le frontend ou les
-  logs.
+- Les credentials GitHub/GitLab doivent rester gérés par une intégration Replit
+  connectée au moment de l’exécution et ne doivent jamais être copiés dans le
+  frontend ou les logs.
 - Une première API serveur Git distant a été ajoutée pour préparer la sélection
   d’identité, de dépôts, de branches et de pipelines GitHub :
   - `packages/opencode/src/git/remote.ts`
@@ -61,18 +59,22 @@ Sory Code en cours.
   GitHub par défaut.
 - Le type d’adapter `remote-github` est maintenant intégré au cycle natif
   `Workspace.create` :
-  - téléchargement de l’archive via `ReplitConnectors.proxy` côté serveur ;
-  - extraction dans `.opencode/remote-workspaces/<workspace-id>` ;
+  - téléchargement d’un snapshot de fichiers via `ReplitConnectors.proxy` côté serveur ;
+  - écriture dans `.opencode/remote-workspaces/<workspace-id>` ;
   - initialisation Git locale sur la branche sélectionnée ;
   - ajout d’un remote HTTPS sans jamais copier de credential dans l’URL.
+- Une création distante incomplète supprime maintenant le dossier partiel et la
+  ligne de workspace persistée ; l’adapter supprime aussi les fichiers si le
+  téléchargement, l’écriture ou Git échoue.
 - La soumission d’une nouvelle session appelle cet adapter lorsqu’un dépôt
   distant est sélectionné, puis cible le dossier cloné avec le SDK OpenCode
   existant. Le chemin local `main`/`create` conserve son comportement
   précédent.
 - L’adapter GitHub est couvert par
   `packages/opencode/test/control-plane/remote-github-adapter.test.ts` :
-  configuration d’un workspace isolé, conservation du dépôt/branche, cible
-  locale et rejet d’une configuration GitLab.
+  configuration d’un workspace isolé, création réelle avec snapshot simulé,
+  branche, remote, commit initial, nettoyage d’erreur et rejet de chemins
+  dangereux.
 - L’interface de nouvelle session réutilise maintenant le chat existant avec
   une sélection GitHub dépôt → branche :
   - `packages/app/src/components/dialog-select-remote-repository.tsx`
@@ -85,7 +87,10 @@ Sory Code en cours.
 - Le Preview Replit a affiché l’interface OpenCode existante.
 - Le serveur a démarré correctement après reconstruction des dépendances.
 - Le workflow doit être redémarré après toute modification serveur.
-- `bun run typecheck` passe dans `packages/opencode`.
+- Les tests workspace et adapter passent après la reconstruction des
+  dépendances. `bun run typecheck` est actuellement tué par la limite mémoire
+  de l’environnement (`tsgo` reçoit `SIGKILL`, et `tsc` termine en OOM) avant
+  d’émettre un diagnostic.
 - `bun run --cwd packages/app typecheck` passe.
 - Les tests HTTP ciblés `httpapi-global.test.ts` et
   `httpapi-control-plane.test.ts` passent.
@@ -99,18 +104,209 @@ Sory Code en cours.
 
 ### Reprise exacte du travail
 
-1. Ajouter les tests spécifiques de l’adapter `remote-github`, avec un
-   téléchargement GitHub simulé et des vérifications de chemin/remote.
-2. Vérifier le parcours complet de création avec un dépôt de test, puis
-   améliorer le nettoyage des workspaces distants abandonnés.
-3. Relier les opérations Git distantes (fetch, commit, push), les pipelines et
+1. Relier les opérations Git distantes (fetch, commit, push), les pipelines et
    les logs CI/CD à l’interface existante.
-4. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
+2. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
    connecté.
-5. Vérifier les parcours mobile/Android sans créer une seconde application.
+3. Vérifier les parcours mobile/Android sans créer une seconde application.
 
-Ne pas commencer le workspace distant, GitLab ou Android avant que cette
-première tranche GitHub soit typée et vérifiée.
+Le workspace distant GitHub est maintenant vérifié par des tests ciblés ; ne pas
+commencer GitLab ou Android avant d’avoir traité la limite de typecheck et la
+prochaine tranche Git/CI.
+
+### Synthèse complète de l’état actuel
+
+#### Déjà réalisé
+
+- Le dépôt OpenCode officiel est adapté directement en Sory Code, sans
+  deuxième application, deuxième chat ou nouvel Agent.
+- Une couche serveur Git distant existe pour GitHub :
+  identité, dépôts, branches et pipelines.
+- Le frontend permet de sélectionner un dépôt GitHub puis une branche depuis le
+  parcours existant de nouvelle session.
+- Le control plane possède un adapter `remote-github`.
+- Le dépôt sélectionné est téléchargé côté serveur sous forme de snapshot de
+  fichiers, puis écrit dans un workspace isolé :
+  `.opencode/remote-workspaces/<workspace-id>`.
+- Git est initialisé sur la branche choisie, avec un remote `origin` sans
+  credential dans l’URL et un commit initial.
+- La session OpenCode existante est ouverte sur ce workspace. Le chat, les
+  tools, le terminal, l’éditeur et les sessions restent ceux d’OpenCode.
+- Les créations incomplètes sont nettoyées : dossier partiel et ligne persistée
+  en base sont supprimés si le téléchargement, l’écriture ou Git échoue.
+- Les chemins dangereux qui sortent du workspace sont refusés.
+- Les tests ciblés couvrent la configuration, la création, la branche, le
+  remote, le commit initial et les nettoyages d’erreur.
+
+#### Ce qui manque
+
+- Rétablir un typecheck complet exploitable. `tsgo` est actuellement tué par
+  `SIGKILL` et `tsc` dépasse la mémoire disponible avant d’émettre un
+  diagnostic.
+- Ajouter les opérations Git utilisateur dans le workspace : `fetch`,
+  changement/création de branche, `commit` et `push`.
+- Ajouter les Pull Requests GitHub et les Merge Requests GitLab avec des
+  permissions explicites et auditables.
+- Relier les opérations Git à l’interface de session existante.
+- Afficher les pipelines CI/CD, leurs états et leurs logs dans l’interface.
+- Lire et exploiter les workflows `.github/workflows` et `.gitlab-ci.yml`.
+- Connecter GitLab uniquement lorsqu’une intégration GitLab réelle sera
+  disponible.
+- Ajouter l’expiration, les statuts persistants, les limites de ressources et le
+  nettoyage périodique des workspaces abandonnés.
+- Corriger les tests frontend SolidJS qui ne démarrent pas actuellement à
+  cause de `solid-js/web/dist/server.js` et de l’export `use`.
+- Vérifier le parcours complet dépôt → branche → workspace → session → chat →
+  fichier → terminal → diff.
+- Vérifier le support mobile/Android. Aucune application Expo/React Native
+  identifiable n’est actuellement présente dans le dépôt.
+
+#### Position actuelle
+
+Le projet est à la fin de la première tranche fonctionnelle GitHub :
+
+```text
+sélection du dépôt
+  → sélection de la branche
+  → workspace isolé
+  → snapshot des fichiers
+  → initialisation Git
+  → session OpenCode existante
+```
+
+Ce n’est pas encore une version Sory Code complète prête pour la production.
+La prochaine implémentation recommandée est le cycle :
+
+```text
+status → commit → push
+```
+
+dans le workspace distant, en réutilisant les services Git et les panneaux
+existants d’OpenCode. Les pipelines CI/CD et GitLab viendront ensuite.
+
+### Journal de reprise par étapes
+
+#### Étape 1 — Préparer le cycle Git du workspace
+
+**Objectif avant implémentation :** permettre au serveur OpenCode de lire l’état
+du dépôt, créer un commit et pousser la branche courante depuis le workspace
+distant, sans exposer de credential.
+
+**Périmètre prévu :**
+
+- réutiliser le service Git/VCS existant ;
+- ajouter uniquement les contrats serveur nécessaires ;
+- conserver les contrôles de workspace et de permissions ;
+- ajouter des tests pour dépôt propre, modifications, absence de remote et
+  erreur de push ;
+- ne pas encore ajouter Pull Request, pipeline ou GitLab.
+
+**Critères de fin :**
+
+- les opérations s’exécutent dans le workspace sélectionné, jamais dans le
+  dépôt parent ;
+- les credentials restent gérés par Git/connecteur côté serveur ;
+- les erreurs sont retournées explicitement ;
+- les tests ciblés passent ;
+- le résultat et la prochaine étape sont ajoutés ici avant de poursuivre.
+
+#### Étape 1A — Contrats et opérations Git serveur
+
+**Objectif avant implémentation :** ajouter `commit` et `push` au service VCS et
+à l’API d’instance en réutilisant `Git.run` et l’autorisation HTTP existante.
+
+**Périmètre prévu :**
+
+- valider le message de commit côté API ;
+- refuser un projet non Git ou un workspace sans remote ;
+- ne jamais transmettre de credential dans l’URL ni dans les logs ;
+- retourner des erreurs explicites pour absence de changements et échec Git ;
+- tester les opérations sur un dépôt temporaire et un remote local contrôlé ;
+- ne pas ajouter encore Pull Request, pipeline ou GitLab.
+
+**Critères de fin :**
+
+- `commit` ne touche que le répertoire de l’instance courante ;
+- `push` utilise le remote Git configuré par le workspace ;
+- l’API expose des schémas typés pour succès et erreurs ;
+- les tests du service VCS et de l’API passent ;
+- cette section est mise à jour avant de commencer l’intégration frontend.
+
+#### Étape 1A.1 — Validation du cycle Git serveur
+
+**Objectif avant implémentation :** prouver le comportement de `commit` et
+`push` sur des dépôts temporaires, sans réseau réel ni credential.
+
+**Périmètre prévu :**
+
+- créer un commit sur des fichiers ajoutés ou modifiés ;
+- refuser un commit quand le dépôt est propre ;
+- pousser vers un remote bare local ;
+- refuser un push sans remote ;
+- vérifier que le hash et la branche retournés sont propres et exploitables ;
+- vérifier les routes HTTP correspondantes.
+
+**Critères de fin :**
+
+- les tests n’utilisent aucun secret ou service externe ;
+- le remote utilisé par défaut est `origin` lorsqu’il existe ;
+- les erreurs métier restent explicites et sans sortie Git sensible ;
+- cette section est marquée terminée avant de documenter l’intégration frontend.
+
+**Résultat :** terminée côté service VCS. Les tests couvrent commit, dépôt
+propre, push vers un remote bare local, remote `origin` et absence de remote.
+La validation HTTP est également terminée : les endpoints commit et push
+répondent avec leurs contrats de succès et d’erreur.
+
+#### Étape 1A.2 — Régénération du client API
+
+**Objectif avant implémentation :** mettre à jour les clients TypeScript après
+l’ajout des routes publiques `vcs/commit` et `vcs/push`, sans éditer les sorties
+générées à la main.
+
+**Périmètre prévu :**
+
+- installer uniquement les dépendances Bun manquantes de `packages/client` ;
+- lancer `bun run generate` depuis `packages/client` ;
+- vérifier que les types et méthodes client correspondent aux routes serveur ;
+- ne pas modifier les contrats générés manuellement.
+
+**Critères de fin :**
+
+- la génération officielle termine sans erreur ;
+- les changements générés sont limités aux nouveaux endpoints VCS ;
+- les tests de contrat client restent cohérents ;
+- le résultat est documenté avant l’intégration frontend.
+
+**Résultat :** terminée. Les dépendances de `packages/client` ont été
+reconstruites, `bun run generate` réussit et le test d’identité des contrats
+client passe. Aucun fichier généré n’a été édité manuellement.
+
+#### Étape 1B — Actions Git dans l’interface existante
+
+**Objectif avant implémentation :** permettre à l’utilisateur de créer un
+commit et de pousser la branche courante depuis les composants de session
+existants, après consultation du statut Git.
+
+**Périmètre prévu :**
+
+- réutiliser le client SDK généré et les helpers d’API existants ;
+- placer les actions dans le contexte Git/diff déjà visible, sans nouveau chat
+  ni nouvelle application ;
+- demander un message de commit avant l’action ;
+- afficher les états chargement, succès, dépôt propre et erreur ;
+- rafraîchir le statut et le diff après un commit ou un push ;
+- conserver tous les textes visibles dans l’i18n ;
+- ne pas encore ajouter Pull/Merge Request, pipeline ou GitLab.
+
+**Critères de fin :**
+
+- les actions utilisent l’identifiant du workspace courant ;
+- le client envoie le vrai contrat généré ;
+- le résultat de chaque mutation est visible sans rechargement manuel ;
+- les erreurs serveur sont affichées sans credential ni sortie Git sensible ;
+- les tests frontend ou une vérification équivalente passent ;
+- cette section est mise à jour avant la prochaine étape Git/CI.
 
 ### Installer les dépendances
 

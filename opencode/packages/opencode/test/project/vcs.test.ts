@@ -3,7 +3,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { parsePatch } from "diff"
-import { Deferred, Effect, Layer } from "effect"
+import { Deferred, Effect, Exit, Layer } from "effect"
 import fs from "fs/promises"
 import path from "path"
 import {
@@ -329,6 +329,82 @@ describe("Vcs diff", () => {
             }),
           ]),
         )
+      }),
+    { git: true },
+  )
+})
+
+describe("Vcs operations", () => {
+  afterEach(async () => {
+    await disposeAllInstances()
+  })
+
+  it.instance(
+    "creates a commit from working tree changes",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        yield* write(path.join(test.directory, "changed.txt"), "hello\n")
+
+        const vcs = yield* init()
+        const result = yield* vcs.commit({ message: "save changes" })
+        const log = yield* Git.Service.use((service) =>
+          service.run(["log", "-1", "--pretty=%s"], { cwd: test.directory }),
+        )
+
+        expect(result).toMatchObject({ committed: true, branch: expect.any(String), hash: expect.any(String) })
+        expect(log.text().trim()).toBe("save changes")
+        expect(yield* vcs.status()).toEqual([])
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "rejects a commit when the working tree is clean",
+    () =>
+      Effect.gen(function* () {
+        const vcs = yield* init()
+        const exit = yield* Effect.exit(vcs.commit({ message: "nothing to save" }))
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(String(exit)).toContain("There are no changes to commit")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "pushes the current branch to origin",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const remote = yield* tmpdirScoped()
+        yield* git(remote, ["init", "--bare"])
+        yield* git(test.directory, ["remote", "add", "origin", remote])
+        yield* write(path.join(test.directory, "pushed.txt"), "pushed\n")
+
+        const vcs = yield* init()
+        yield* vcs.commit({ message: "push changes" })
+        const result = yield* vcs.push()
+        const remoteRefs = yield* Git.Service.use((service) =>
+          service.run(["show-ref", "--heads", result.branch], { cwd: remote }),
+        )
+
+        expect(result).toEqual({ pushed: true, branch: result.branch, remote: "origin" })
+        expect(remoteRefs.exitCode).toBe(0)
+        expect(remoteRefs.text()).toContain(`refs/heads/${result.branch}`)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "rejects a push when no remote is configured",
+    () =>
+      Effect.gen(function* () {
+        const vcs = yield* init()
+        const exit = yield* Effect.exit(vcs.push())
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(String(exit)).toContain("No Git remote is configured")
       }),
     { git: true },
   )

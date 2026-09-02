@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test"
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import { execFile } from "node:child_process"
+import { tmpdir } from "node:os"
 import path from "node:path"
-import { RemoteGithubAdapter } from "../../src/control-plane/adapters/remote-github"
+import { promisify } from "node:util"
+import { createRemoteGithubAdapter, RemoteGithubAdapter } from "../../src/control-plane/adapters/remote-github"
 import type { WorkspaceInfo } from "../../src/control-plane/types"
+
+const execFileAsync = promisify(execFile)
 
 const info = {
   id: "workspace_test",
@@ -54,5 +60,87 @@ describe("remote-github workspace adapter", () => {
         },
       ),
     ).rejects.toThrow()
+  })
+
+  test("downloads a snapshot, initializes the selected branch, and records the remote", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "remote-github-test-"))
+
+    try {
+      const adapter = createRemoteGithubAdapter({
+        downloadSnapshot: async () => [
+          { path: "README.md", content: Buffer.from("Sory Code\n"), executable: false },
+          { path: "bin/run.sh", content: Buffer.from("#!/bin/sh\n"), executable: true },
+        ],
+      })
+      const configured = await adapter.configure(info, {
+        instance: {
+          directory: root,
+          worktree: root,
+          project: {} as never,
+        },
+      })
+
+      await adapter.create(configured, {})
+
+      expect(await readFile(path.join(configured.directory!, "README.md"), "utf8")).toBe("Sory Code\n")
+      expect((await stat(path.join(configured.directory!, "bin", "run.sh"))).mode & 0o111).not.toBe(0)
+      expect(
+        (await execFileAsync("git", ["-C", configured.directory!, "branch", "--show-current"])).stdout.trim(),
+      ).toBe("main")
+      expect(
+        (await execFileAsync("git", ["-C", configured.directory!, "config", "--get", "remote.origin.url"])).stdout.trim(),
+      ).toBe("https://github.com/sory-cosmic/sory-code.git")
+      expect((await execFileAsync("git", ["-C", configured.directory!, "status", "--porcelain"])).stdout.trim()).toBe("")
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test("removes a partial workspace when the snapshot download fails", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "remote-github-failure-test-"))
+
+    try {
+      const adapter = createRemoteGithubAdapter({
+        async downloadSnapshot() {
+          throw new Error("download exploded")
+        },
+      })
+      const configured = await adapter.configure(info, {
+        instance: {
+          directory: root,
+          worktree: root,
+          project: {} as never,
+        },
+      })
+
+      await expect(adapter.create(configured, {})).rejects.toThrow("download exploded")
+      await expect(stat(configured.directory!)).rejects.toMatchObject({ code: "ENOENT" })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
+  })
+
+  test("rejects paths outside the isolated workspace and cleans up", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "remote-github-path-test-"))
+
+    try {
+      const adapter = createRemoteGithubAdapter({
+        async downloadSnapshot() {
+          return [{ path: "../outside.txt", content: Buffer.from("unsafe"), executable: false }]
+        },
+      })
+      const configured = await adapter.configure(info, {
+        instance: {
+          directory: root,
+          worktree: root,
+          project: {} as never,
+        },
+      })
+
+      await expect(adapter.create(configured, {})).rejects.toThrow("Unsafe repository path")
+      await expect(stat(configured.directory!)).rejects.toMatchObject({ code: "ENOENT" })
+    } finally {
+      await rm(root, { recursive: true, force: true })
+    }
   })
 })

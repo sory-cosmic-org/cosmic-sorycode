@@ -40,6 +40,18 @@ export class ApiVcsApplyError extends Schema.ErrorClass<ApiVcsApplyError>("VcsAp
   { httpApiStatus: 400 },
 ) {}
 
+export class ApiVcsOperationError extends Schema.ErrorClass<ApiVcsOperationError>("VcsOperationError")(
+  {
+    name: Schema.Literal("VcsOperationError"),
+    data: Schema.Struct({
+      message: Schema.String,
+      action: Schema.Literals(["commit", "push"]),
+      reason: Schema.Literals(["non-git", "nothing-to-commit", "no-remote", "failed"]),
+    }),
+  },
+  { httpApiStatus: 400 },
+) {}
+
 export const InstancePaths = {
   dispose: "/instance/dispose",
   path: "/path",
@@ -48,6 +60,8 @@ export const InstancePaths = {
   vcsDiff: "/vcs/diff",
   vcsDiffRaw: "/vcs/diff/raw",
   vcsApply: "/vcs/apply",
+  vcsCommit: "/vcs/commit",
+  vcsPush: "/vcs/push",
   command: "/command",
   agent: "/agent",
   skill: "/skill",
@@ -134,6 +148,29 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "vcs.apply",
             summary: "Apply VCS patch",
             description: "Apply a raw patch to the current working tree.",
+          }),
+        ),
+        HttpApiEndpoint.post("vcsCommit", InstancePaths.vcsCommit, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.CommitInput,
+          success: described(Vcs.CommitResult, "VCS commit created"),
+          error: ApiVcsOperationError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "vcs.commit",
+            summary: "Create VCS commit",
+            description: "Stage current changes and create a commit in the current workspace.",
+          }),
+        ),
+        HttpApiEndpoint.post("vcsPush", InstancePaths.vcsPush, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.PushResult, "VCS changes pushed"),
+          error: ApiVcsOperationError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "vcs.push",
+            summary: "Push VCS changes",
+            description: "Push the current branch to its configured Git remote.",
           }),
         ),
         HttpApiEndpoint.get("command", InstancePaths.command, {

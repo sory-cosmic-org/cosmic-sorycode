@@ -544,7 +544,7 @@ describe("workspace CRUD", () => {
   )
 
   it.instance(
-    "create leaves the inserted row when adapter create fails",
+    "create cleans up the inserted row when adapter create fails",
     () =>
       Effect.gen(function* () {
         const instance = yield* requireInstance
@@ -568,10 +568,10 @@ describe("workspace CRUD", () => {
         )
 
         const rows = yield* workspace.list(instance.project)
-        expect(rows).toHaveLength(1)
-        expect(rows[0]).toMatchObject({ type, branch: "branch", extra: { x: 1 } })
+        expect(rows).toEqual([])
         expect(recorded.calls.target).toHaveLength(0)
-        yield* workspace.remove(rows[0].id)
+        expect(recorded.calls.remove).toHaveLength(1)
+        expect(recorded.calls.remove[0]).toMatchObject({ type, branch: "branch", extra: { x: 1 } })
       }),
     { git: true },
   )

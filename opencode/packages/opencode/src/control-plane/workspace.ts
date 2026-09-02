@@ -535,7 +535,22 @@ const layer = Layer.effect(
         OTEL_RESOURCE_ATTRIBUTES: process.env.OTEL_RESOURCE_ATTRIBUTES,
       }
 
-      yield* WorkspaceAdapterRuntime.create(adapter, config, env)
+      yield* WorkspaceAdapterRuntime.create(adapter, config, env).pipe(
+        Effect.catchCause((cause) =>
+          Effect.gen(function* () {
+            yield* WorkspaceAdapterRuntime.remove(config).pipe(
+              Effect.catchCause((cleanupCause) =>
+                Effect.logWarning("workspace adapter cleanup failed after create error", {
+                  workspaceID: id,
+                  error: errorData(cleanupCause),
+                }),
+              ),
+            )
+            yield* db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run().pipe(Effect.orDie)
+            return yield* Effect.failCause(cause)
+          }),
+        ),
+      )
       yield* Effect.all(
         [
           waitEvent({
