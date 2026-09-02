@@ -224,6 +224,7 @@ type PromptSubmitInput = {
   setPopover: (popover: "at" | "slash" | null) => void
   newSessionWorktree?: Accessor<string | undefined>
   onNewSessionWorktreeReset?: () => void
+  onNewSessionRemoteCreate?: () => Promise<string | undefined>
   shouldQueue?: Accessor<boolean>
   onQueue?: (draft: FollowupDraft) => void
   onAbort?: () => void
@@ -360,7 +361,21 @@ export function createPromptSubmit(input: PromptSubmitInput) {
     let client = sdk().client
 
     if (isNewSession) {
-      if (worktreeSelection === "create") {
+      let remoteDirectory: string | undefined
+      if (input.onNewSessionRemoteCreate) {
+        try {
+          remoteDirectory = await input.onNewSessionRemoteCreate()
+          if (remoteDirectory) sessionDirectory = remoteDirectory
+        } catch (err) {
+          showToast({
+            title: language.t("workspace.create.failed.title"),
+            description: errorMessage(err),
+          })
+          return
+        }
+      }
+
+      if (!remoteDirectory && worktreeSelection === "create") {
         const createdWorktree = await client.worktree
           .create({ directory: projectDirectory })
           .then((x) => x.data)
@@ -383,7 +398,7 @@ export function createPromptSubmit(input: PromptSubmitInput) {
         sessionDirectory = createdWorktree.directory
       }
 
-      if (worktreeSelection !== "main" && worktreeSelection !== "create") {
+      if (!remoteDirectory && worktreeSelection !== "main" && worktreeSelection !== "create") {
         sessionDirectory = worktreeSelection
       }
 

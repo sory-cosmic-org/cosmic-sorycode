@@ -82,6 +82,29 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/RemoteGit") {}
 
+export async function downloadRepositoryArchive(input: {
+  readonly owner: string
+  readonly repository: string
+  readonly branch: string
+}) {
+  const response = await connectors.proxy(
+    "github",
+    `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/tarball/${encodePath(input.branch)}`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  )
+  if (!response.ok) {
+    const body = await response.text()
+    throw new RemoteGitProviderError("github", response.status, body.slice(0, 300) || "GitHub archive download failed")
+  }
+  return Buffer.from(await response.arrayBuffer())
+}
+
 type GithubRepository = {
   id: number
   name: string

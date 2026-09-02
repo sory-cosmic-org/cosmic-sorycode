@@ -68,6 +68,25 @@ export function createNewSessionWorkspaceController() {
       value: remote,
       set: setRemote,
       reset: () => setRemote(),
+      create: async () => {
+        const selection = remote()
+        if (!selection) return
+        const result = await sdk().client.experimental.workspace.create({
+          directory: sdk().directory,
+          type: "remote-github",
+          branch: selection.branch.name,
+          extra: {
+            provider: selection.repository.provider,
+            owner: selection.repository.owner,
+            repository: selection.repository.name,
+            branch: selection.branch.name,
+          },
+        })
+        const directory = result.data?.directory
+        if (!directory) throw new Error("Remote workspace did not return a directory")
+        setWorktree(directory)
+        return directory
+      },
     },
     project: {
       root: projectRoot,

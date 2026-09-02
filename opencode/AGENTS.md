@@ -59,6 +59,20 @@ Sory Code en cours.
 - Les requêtes `provider=gitlab` sont rejetées explicitement en `502` tant que
   l’intégration GitLab n’est pas connectée ; elles ne sont pas routées vers
   GitHub par défaut.
+- Le type d’adapter `remote-github` est maintenant intégré au cycle natif
+  `Workspace.create` :
+  - téléchargement de l’archive via `ReplitConnectors.proxy` côté serveur ;
+  - extraction dans `.opencode/remote-workspaces/<workspace-id>` ;
+  - initialisation Git locale sur la branche sélectionnée ;
+  - ajout d’un remote HTTPS sans jamais copier de credential dans l’URL.
+- La soumission d’une nouvelle session appelle cet adapter lorsqu’un dépôt
+  distant est sélectionné, puis cible le dossier cloné avec le SDK OpenCode
+  existant. Le chemin local `main`/`create` conserve son comportement
+  précédent.
+- L’adapter GitHub est couvert par
+  `packages/opencode/test/control-plane/remote-github-adapter.test.ts` :
+  configuration d’un workspace isolé, conservation du dépôt/branche, cible
+  locale et rejet d’une configuration GitLab.
 - L’interface de nouvelle session réutilise maintenant le chat existant avec
   une sélection GitHub dépôt → branche :
   - `packages/app/src/components/dialog-select-remote-repository.tsx`
@@ -75,20 +89,25 @@ Sory Code en cours.
 - `bun run --cwd packages/app typecheck` passe.
 - Les tests HTTP ciblés `httpapi-global.test.ts` et
   `httpapi-control-plane.test.ts` passent.
+- La suite ciblée serveur combinant l’adapter et les routes passe :
+  `7 pass, 0 fail`.
+- Le test frontend de soumission et celui du contrôleur ne démarrent pas dans
+  l’environnement Bun actuel à cause de l’erreur de module
+  `solid-js/web/dist/server.js` (`Export named 'use' not found`). Ce problème
+  intervient avant les assertions ; il reste à traiter séparément dans la
+  configuration de test SolidJS.
 
 ### Reprise exacte du travail
 
-1. Ajouter un endpoint serveur de création de workspace distant à partir du
-   dépôt et de la branche sélectionnés.
-2. Définir une stratégie de clonage sécurisée pour les dépôts privés sans
-   exposer le token GitHub au frontend ni aux logs.
-3. Attacher l’instance OpenCode existante au workspace isolé et relier le
-   terminal, les fichiers, Git, les diffs et le streaming.
-4. Brancher la soumission de la nouvelle session sur ce workspace distant.
-5. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
+1. Ajouter les tests spécifiques de l’adapter `remote-github`, avec un
+   téléchargement GitHub simulé et des vérifications de chemin/remote.
+2. Vérifier le parcours complet de création avec un dépôt de test, puis
+   améliorer le nettoyage des workspaces distants abandonnés.
+3. Relier les opérations Git distantes (fetch, commit, push), les pipelines et
+   les logs CI/CD à l’interface existante.
+4. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
    connecté.
-6. Ajouter les tests spécifiques du contrat Git distant et vérifier les
-   parcours mobile/Android sans créer une seconde application.
+5. Vérifier les parcours mobile/Android sans créer une seconde application.
 
 Ne pas commencer le workspace distant, GitLab ou Android avant que cette
 première tranche GitHub soit typée et vérifiée.
