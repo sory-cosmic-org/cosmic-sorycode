@@ -2,6 +2,7 @@ import { createMemo, createSignal } from "solid-js"
 import { useSDK } from "@/context/sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
+import type { RemoteGitSelection } from "@/components/dialog-select-remote-repository"
 
 const workspaceBarEnabled = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
@@ -36,6 +37,7 @@ export function createNewSessionWorkspaceController() {
   const sync = useSync()
   const serverSync = useServerSync()
   const [worktree, setWorktree] = createSignal<string>()
+  const [remote, setRemote] = createSignal<RemoteGitSelection>()
   const visible = createMemo(() => workspaceBarEnabled && sync().project?.vcs === "git")
   const value = createMemo(() =>
     resolveNewSessionWorktree({
@@ -61,6 +63,11 @@ export function createNewSessionWorkspaceController() {
       reset: () => setWorktree(),
       set: (worktree: string) =>
         setWorktree(normalizeNewSessionWorktree(worktree, sdk().directory, sync().project?.worktree)),
+    },
+    remote: {
+      value: remote,
+      set: setRemote,
+      reset: () => setRemote(),
     },
     project: {
       root: projectRoot,

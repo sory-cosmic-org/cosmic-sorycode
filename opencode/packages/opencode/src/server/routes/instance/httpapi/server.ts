@@ -15,6 +15,7 @@ import { Env } from "@/env"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Format } from "@/format"
 import { Git } from "@/git"
+import { node as RemoteGitNode } from "@/git/remote"
 import { Installation } from "@/installation"
 import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
@@ -88,6 +89,7 @@ import { controlPlaneHandlers } from "./handlers/control-plane"
 import { experimentalHandlers } from "./handlers/experimental"
 import { fileHandlers } from "./handlers/file"
 import { globalHandlers } from "./handlers/global"
+import { gitHandlers } from "./handlers/git"
 import { instanceHandlers } from "./handlers/instance"
 import { mcpHandlers } from "./handlers/mcp"
 import { permissionHandlers } from "./handlers/permission"
@@ -139,7 +141,7 @@ const ptyConnectHttpApiAuthLayer = ptyConnectAuthorizationLayer.pipe(Layer.provi
 const serverHttpApiAuthLayer = serverAuthorizationLayer.pipe(Layer.provide(ServerAuth.Config.layer))
 const workspaceRoutingLive = workspaceRoutingLayer.pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 const rootApiRoutes = HttpApiBuilder.layer(RootHttpApi).pipe(
-  Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers]),
+  Layer.provide([controlHandlers, controlPlaneHandlers, globalHandlers, gitHandlers]),
   Layer.provide(schemaErrorLayer),
   Layer.provide(httpApiAuthLayer),
 )
@@ -218,6 +220,7 @@ const app = LayerNode.group([
   Config.node,
   Env.node,
   Git.node,
+  RemoteGitNode,
   Ripgrep.node,
   Storage.node,
   Snapshot.node,

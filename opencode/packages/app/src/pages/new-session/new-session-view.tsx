@@ -10,6 +10,10 @@ import createPresence from "solid-presence"
 import { PromptInputV2Composer } from "@/components/prompt-input-v2"
 import { PromptGitStatus, PromptWorkspaceSelector } from "@/components/prompt-workspace-selector"
 import {
+  DialogSelectRemoteRepository,
+  PromptRemoteRepositoryButton,
+} from "@/components/dialog-select-remote-repository"
+import {
   PromptProjectAddButton,
   PromptProjectSelector,
   type PromptProjectController,
@@ -31,6 +35,11 @@ export function NewSessionView(props: {
   project: PromptProjectController
   workspace: NewSessionWorkspaceController
 }) {
+  const dialog = useDialog()
+  const openRemoteRepository = () => {
+    void dialog.show(() => <DialogSelectRemoteRepository onSelect={props.workspace.remote.set} />)
+  }
+
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
       <div
@@ -48,6 +57,10 @@ export function NewSessionView(props: {
               <Show when={props.project.selected()}>
                 <div class="flex min-h-7 min-w-0 flex-col items-center justify-center gap-0 text-v2-text-text-faint sm:flex-row">
                   <PromptProjectSelector controller={props.project} placement="bottom" />
+                  <PromptRemoteRepositoryButton
+                    selection={props.workspace.remote.value()}
+                    onClick={openRemoteRepository}
+                  />
                   <Show
                     when={props.workspace.bar.visible()}
                     fallback={

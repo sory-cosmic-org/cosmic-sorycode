@@ -18,6 +18,81 @@ cd opencode
 Modifier uniquement les fichiers nécessaires dans `opencode/`. Les changements
 faits dans l’éditeur sont enregistrés directement dans le projet Replit.
 
+## État d’avancement Sory Code
+
+Cette section sert de point de reprise lorsque le quota ou une interruption
+oblige à arrêter le travail. Elle décrit uniquement l’état de l’adaptation
+Sory Code en cours.
+
+### Ce qui a été fait
+
+- Le dépôt OpenCode officiel est utilisé directement, sans créer de projet ou
+  de chat parallèle.
+- Le plan d’adaptation est enregistré dans `PLAN-SORY-CODE.md`.
+- Le workflow Replit `Start OpenCode` a été configuré pour lancer le serveur
+  depuis le dossier `opencode` sur `0.0.0.0:5000`.
+- Python 3.11 a été ajouté à l’environnement Replit, car une dépendance native
+  `tree-sitter-powershell` en a besoin pour `node-gyp`.
+- Les liens de dépendances Bun du monorepo ont été reconstruits avec
+  `bun install --force --filter opencode --offline`.
+- L’intégration GitHub Replit est connectée. Les credentials doivent rester
+  gérés par Replit et ne doivent jamais être copiés dans le frontend ou les
+  logs.
+- Une première API serveur Git distant a été ajoutée pour préparer la sélection
+  d’identité, de dépôts, de branches et de pipelines GitHub :
+  - `packages/opencode/src/git/remote.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/groups/git.ts`
+  - `packages/opencode/src/server/routes/instance/httpapi/handlers/git.ts`
+- Les routes Git ont été enregistrées dans `api.ts` et `server.ts`.
+- `@replit/connectors-sdk` a été ajouté aux dépendances de
+  `packages/opencode`. La version réellement disponible dans le registre est
+  `0.4.3`; la fiche d’intégration affichait une version non publiée
+  `21.1.1`.
+- Les routes serveur validées sont :
+  - `GET /git/identity`
+  - `GET /git/repositories`
+  - `GET /git/repositories/:owner/:repository/branches`
+  - `GET /git/repositories/:owner/:repository/pipelines`
+- L’API GitHub a été vérifiée avec la connexion Replit active : l’identité
+  GitHub, le dépôt `sory-cosmic/sory-code`, sa branche `main` et l’absence
+  actuelle de pipeline sont retournés correctement.
+- Les requêtes `provider=gitlab` sont rejetées explicitement en `502` tant que
+  l’intégration GitLab n’est pas connectée ; elles ne sont pas routées vers
+  GitHub par défaut.
+- L’interface de nouvelle session réutilise maintenant le chat existant avec
+  une sélection GitHub dépôt → branche :
+  - `packages/app/src/components/dialog-select-remote-repository.tsx`
+  - `packages/app/src/utils/remote-git.ts`
+  - `packages/app/src/pages/new-session/new-session-view.tsx`
+  - `packages/app/src/pages/new-session/new-session-workspace-controller.ts`
+
+### Vérifications déjà réussies
+
+- Le Preview Replit a affiché l’interface OpenCode existante.
+- Le serveur a démarré correctement après reconstruction des dépendances.
+- Le workflow doit être redémarré après toute modification serveur.
+- `bun run typecheck` passe dans `packages/opencode`.
+- `bun run --cwd packages/app typecheck` passe.
+- Les tests HTTP ciblés `httpapi-global.test.ts` et
+  `httpapi-control-plane.test.ts` passent.
+
+### Reprise exacte du travail
+
+1. Ajouter un endpoint serveur de création de workspace distant à partir du
+   dépôt et de la branche sélectionnés.
+2. Définir une stratégie de clonage sécurisée pour les dépôts privés sans
+   exposer le token GitHub au frontend ni aux logs.
+3. Attacher l’instance OpenCode existante au workspace isolé et relier le
+   terminal, les fichiers, Git, les diffs et le streaming.
+4. Brancher la soumission de la nouvelle session sur ce workspace distant.
+5. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
+   connecté.
+6. Ajouter les tests spécifiques du contrat Git distant et vérifier les
+   parcours mobile/Android sans créer une seconde application.
+
+Ne pas commencer le workspace distant, GitLab ou Android avant que cette
+première tranche GitHub soit typée et vérifiée.
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :
