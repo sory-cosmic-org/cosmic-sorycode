@@ -1,0 +1,317 @@
+IMPORTANT : LE WORKSPACE EST MAINTENANT PROPRE.
+
+J'ai supprimé les anciens projets et fichiers inutiles du workspace Replit.
+
+J'ai déjà cloné le dépôt officiel OpenCode dans ce workspace :
+
+https://github.com/anomalyco/opencode.git
+
+C'est maintenant CE CODE SOURCE qui constitue la base officielle de Sory Code.
+
+NE crée PAS un nouveau projet à côté.
+NE crée PAS une nouvelle application qui imite OpenCode.
+NE recrée PAS les fonctionnalités déjà présentes dans OpenCode.
+
+Travaille directement sur le dépôt OpenCode que j'ai cloné.
+
+==================================================
+OBJECTIF
+==================================================
+
+Nous voulons transformer OpenCode en "Sory Code".
+
+Sory Code doit conserver au maximum les fonctionnalités existantes d'OpenCode :
+
+- chat ;
+- conversations ;
+- sessions ;
+- Agent ;
+- tools ;
+- terminal ;
+- éditeur ;
+- Git ;
+- providers IA ;
+- streaming ;
+- serveur ;
+- architecture du monorepo.
+
+IMPORTANT :
+
+LE CHAT EXISTE DÉJÀ DANS OPENCode.
+
+NE CRÉE PAS UN NOUVEAU CHAT.
+
+NE RECRÉE PAS UNE NOUVELLE INTERFACE DE CHAT.
+
+Nous voulons utiliser le chat existant d'OpenCode comme interface principale pour parler à l'Agent.
+
+==================================================
+NOTRE VRAIE MODIFICATION
+==================================================
+
+Le changement principal concerne la façon dont l'Agent travaille sur les projets.
+
+Nous ne voulons plus dépendre uniquement d'un dossier de projet local.
+
+Nous voulons :
+
+Android
+↓
+Sory Code
+↓
+GitHub / GitLab
+↓
+Dépôt distant
+↓
+Remote Workspace
+↓
+Agent OpenCode
+↓
+fichiers / terminal / commandes / build / tests / Git / CI
+
+L'utilisateur doit pouvoir se connecter à GitHub ou GitLab, choisir un dépôt et une branche, puis travailler directement dessus.
+
+Le dépôt doit être cloné dans un workspace distant.
+
+Le téléphone n'est PAS le serveur de développement.
+
+==================================================
+ANDROID
+==================================================
+
+L'application Sory Code doit être mobile-first et utiliser l'application Expo/React Native existante d'OpenCode si elle est déjà présente.
+
+NE crée PAS une deuxième application Expo inutile.
+
+Le téléphone sert principalement d'interface.
+
+Il ne doit pas avoir besoin d'installer :
+
+Cargo
+Rust
+Node
+npm
+Bun
+Python
+Docker
+ou les dépendances lourdes du projet.
+
+Les commandes lourdes doivent être exécutées dans le workspace distant.
+
+==================================================
+GITHUB / GITLAB
+==================================================
+
+Ajouter une vraie intégration GitHub et GitLab.
+
+L'utilisateur doit pouvoir :
+
+- connecter GitHub ;
+- connecter GitLab ;
+- voir ses dépôts ;
+- rechercher un dépôt ;
+- choisir un dépôt ;
+- choisir une branche ;
+- ouvrir le projet.
+
+Architecture souhaitée :
+
+GitProvider
+├── GitHub
+└── GitLab
+
+Le dépôt sélectionné est ensuite cloné dans le workspace distant.
+
+==================================================
+REMOTE WORKSPACE
+==================================================
+
+Chaque projet ouvert doit disposer d'un environnement de travail distant isolé.
+
+L'Agent OpenCode travaille réellement dans cet environnement.
+
+Il doit pouvoir exécuter selon le projet :
+
+cargo
+npm
+bun
+python
+go
+make
+cmake
+git
+etc.
+
+Il doit pouvoir :
+
+- lire les fichiers ;
+- créer des fichiers ;
+- modifier des fichiers ;
+- rechercher ;
+- utiliser le terminal ;
+- compiler ;
+- tester ;
+- analyser les erreurs ;
+- corriger le code.
+
+==================================================
+GIT / CI/CD
+==================================================
+
+L'Agent doit pouvoir travailler avec GitHub/GitLab :
+
+- branches ;
+- commits ;
+- push ;
+- Pull Request ;
+- Merge Request.
+
+Il doit également comprendre :
+
+.github/workflows/*.yml
+.gitlab-ci.yml
+
+et pouvoir exploiter les résultats des pipelines pour corriger les erreurs.
+
+==================================================
+ÉDITEUR
+==================================================
+
+Conserver l'éditeur existant d'OpenCode autant que possible.
+
+Nous changeons principalement sa source de projet :
+
+AVANT :
+
+dossier local
+→ projet
+→ éditeur
+
+APRÈS :
+
+GitHub/GitLab
+→ dépôt
+→ workspace distant
+→ éditeur
+
+L'utilisateur doit pouvoir voir :
+
+- arborescence ;
+- fichiers ;
+- modifications ;
+- diff ;
+- terminal ;
+- logs ;
+- tests ;
+- build.
+
+==================================================
+INTERFACE
+==================================================
+
+NE transforme pas Sory Code en un simple chatbot.
+
+Le chat existant d'OpenCode reste le centre de contrôle.
+
+Autour du chat, l'utilisateur doit pouvoir accéder au contexte du projet :
+
+Projet
+Branche
+Fichiers
+Diff
+Terminal
+Logs
+Tests
+CI/CD
+Git
+
+L'interface doit être adaptée au mobile sans détruire l'interface et les composants existants qui sont utiles.
+
+==================================================
+PIÈCES JOINTES
+==================================================
+
+Android peut accéder à :
+
+- galerie ;
+- caméra ;
+- captures d'écran ;
+- vidéos ;
+- fichiers.
+
+L'utilisateur peut envoyer ces éléments à l'Agent.
+
+Mais le projet de développement lui-même reste dans le workspace distant.
+
+==================================================
+EXPO / REPLIT
+==================================================
+
+Le projet utilise Expo.
+
+Vérifie précisément :
+
+- package.json ;
+- workspace ;
+- version Expo ;
+- React Native ;
+- app.json/app.config ;
+- Metro ;
+- scripts ;
+- dépendances.
+
+Le fait que Replit fournisse une URL de preview comme :
+
+*.expo.reed.replit.dev
+
+ne signifie pas automatiquement que l'application native Android fonctionne.
+
+Diagnostique correctement la méthode de lancement Expo.
+
+Nous voulons pouvoir tester Sory Code réellement sur Android.
+
+Ne crée pas une nouvelle application juste pour contourner ce problème.
+
+==================================================
+MÉTHODE DE TRAVAIL
+==================================================
+
+Avant de modifier le code :
+
+1. Inspecte le dépôt OpenCode cloné.
+2. Comprends son monorepo.
+3. Identifie l'application mobile.
+4. Identifie le chat existant.
+5. Identifie l'Agent.
+6. Identifie les tools.
+7. Identifie le serveur.
+8. Identifie la gestion des projets locaux.
+9. Identifie les parties à modifier pour le Remote Workspace.
+
+Ensuite seulement, commence l'implémentation.
+
+Ne fais pas une réécriture complète.
+
+Réutilise l'architecture OpenCode autant que possible.
+
+==================================================
+RÈGLE ABSOLUE
+==================================================
+
+Le projet actuel EST le dépôt OpenCode que j'ai cloné.
+
+Tu dois donc travailler directement dessus.
+
+NE crée pas un autre projet.
+
+NE crée pas un autre chat.
+
+NE recrée pas l'Agent.
+
+NE recrée pas les tools.
+
+NE recrée pas l'éditeur si celui d'OpenCode peut être adapté.
+
+Notre travail consiste à ADAPTER OpenCode pour devenir Sory Code.
+
+Commence maintenant par inspecter le dépôt OpenCode actuellement présent dans le workspace et explique-moi brièvement son architecture et les fichiers/composants que tu vas modifier avant de commencer les changements importants.
