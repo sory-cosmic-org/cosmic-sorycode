@@ -82,27 +82,96 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/RemoteGit") {}
 
-export async function downloadRepositoryArchive(input: {
+type GithubRefResponse = {
+  object: {
+    sha: string
+  }
+}
+
+type GithubTreeResponse = {
+  truncated: boolean
+  tree: Array<{
+    path: string
+    mode: string
+    type: "blob" | "tree" | "commit"
+    sha: string
+  }>
+}
+
+type GithubBlobResponse = {
+  content: string
+  encoding: "base64"
+}
+
+export type RemoteRepositoryFile = {
+  readonly path: string
+  readonly content: Buffer
+  readonly executable: boolean
+}
+
+const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+
+async function githubJson<T>(path: string, attempt = 0): Promise<T> {
+  const response = await connectors.proxy("github", path, {
+    method: "GET",
+    headers: {
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    if (response.status === 429 && attempt < 2) {
+      const retryAfter = Number(response.headers.get("retry-after") ?? "1")
+      await sleep(Math.max(1000, retryAfter * 1000))
+      return githubJson<T>(path, attempt + 1)
+    }
+    throw new RemoteGitProviderError("github", response.status, body.slice(0, 300) || "GitHub request failed")
+  }
+  return (await response.json()) as T
+}
+
+export async function downloadRepositorySnapshot(input: {
   readonly owner: string
   readonly repository: string
   readonly branch: string
 }) {
-  const response = await connectors.proxy(
-    "github",
-    `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/tarball/${encodePath(input.branch)}`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    },
+  const ref = await githubJson<GithubRefResponse>(
+    `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/git/ref/heads/${encodePath(input.branch)}`,
   )
-  if (!response.ok) {
-    const body = await response.text()
-    throw new RemoteGitProviderError("github", response.status, body.slice(0, 300) || "GitHub archive download failed")
+  const tree = await githubJson<GithubTreeResponse>(
+    `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/git/trees/${encodePath(ref.object.sha)}?recursive=1`,
+  )
+  if (tree.truncated) {
+    throw new RemoteGitProviderError("github", undefined, "GitHub repository tree is too large to download safely")
   }
-  return Buffer.from(await response.arrayBuffer())
+  const blobs = tree.tree.filter((item) => item.type === "blob")
+  const files: RemoteRepositoryFile[] = []
+  for (let offset = 0; offset < blobs.length; offset += 4) {
+    const batch = blobs.slice(offset, offset + 4)
+    const downloaded = await Promise.all(
+      batch.map(async (item) => {
+        const normalized = item.path.replaceAll("\\", "/")
+        if (normalized.startsWith("/") || normalized.split("/").includes("..")) {
+          throw new RemoteGitProviderError("github", undefined, `Unsafe path returned by GitHub: ${item.path}`)
+        }
+        const blob = await githubJson<GithubBlobResponse>(
+          `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/git/blobs/${encodePath(item.sha)}`,
+        )
+        if (blob.encoding !== "base64") {
+          throw new RemoteGitProviderError("github", undefined, `Unsupported GitHub blob encoding for ${item.path}`)
+        }
+        return {
+          path: normalized,
+          content: Buffer.from(blob.content, "base64"),
+          executable: item.mode === "100755",
+        } satisfies RemoteRepositoryFile
+      }),
+    )
+    files.push(...downloaded)
+    if (offset + batch.length < blobs.length) await sleep(500)
+  }
+  return files
 }
 
 type GithubRepository = {

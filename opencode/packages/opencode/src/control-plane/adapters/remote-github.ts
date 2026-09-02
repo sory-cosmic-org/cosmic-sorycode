@@ -1,10 +1,9 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { mkdir, rm, writeFile, chmod } from "node:fs/promises"
+import { dirname, join, resolve, sep } from "node:path"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { Schema } from "effect"
-import { downloadRepositoryArchive } from "@/git/remote"
+import { downloadRepositorySnapshot } from "@/git/remote"
 import type { WorkspaceAdapter } from "../types"
 
 const execFileAsync = promisify(execFile)
@@ -39,30 +38,30 @@ export const RemoteGithubAdapter: WorkspaceAdapter = {
     const config = decodeRemoteConfig(info.extra)
     if (!info.directory) throw new Error("GitHub workspace directory was not configured")
 
-    const archiveDirectory = await mkdtemp(join(tmpdir(), "opencode-github-"))
-    const archivePath = join(archiveDirectory, "repository.tar.gz")
-    try {
-      await mkdir(info.directory, { recursive: true })
-      await rm(info.directory, { recursive: true, force: true })
-      await mkdir(info.directory, { recursive: true })
-      await writeFile(archivePath, await downloadRepositoryArchive(config))
-      await execFileAsync("tar", ["-xzf", archivePath, "-C", info.directory, "--strip-components=1"])
-      await execFileAsync("git", ["-C", info.directory, "init", "-b", config.branch])
-      await execFileAsync("git", [
-        "-C",
-        info.directory,
-        "remote",
-        "add",
-        "origin",
-        `https://github.com/${config.owner}/${config.repository}.git`,
-      ])
-      await execFileAsync("git", ["-C", info.directory, "config", "user.name", "Sory Code"])
-      await execFileAsync("git", ["-C", info.directory, "config", "user.email", "sory-code@localhost"])
-      await execFileAsync("git", ["-C", info.directory, "add", "-A"])
-      await execFileAsync("git", ["-C", info.directory, "commit", "-m", "Initial remote workspace snapshot"])
-    } finally {
-      await rm(archiveDirectory, { recursive: true, force: true })
+    await rm(info.directory, { recursive: true, force: true })
+    await mkdir(info.directory, { recursive: true })
+    for (const file of await downloadRepositorySnapshot(config)) {
+      const target = resolve(info.directory, file.path)
+      if (target !== resolve(info.directory) && !target.startsWith(`${resolve(info.directory)}${sep}`)) {
+        throw new Error(`Unsafe repository path: ${file.path}`)
+      }
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, file.content)
+      if (file.executable) await chmod(target, 0o755)
     }
+    await execFileAsync("git", ["-C", info.directory, "init", "-b", config.branch])
+    await execFileAsync("git", [
+      "-C",
+      info.directory,
+      "remote",
+      "add",
+      "origin",
+      `https://github.com/${config.owner}/${config.repository}.git`,
+    ])
+    await execFileAsync("git", ["-C", info.directory, "config", "user.name", "Sory Code"])
+    await execFileAsync("git", ["-C", info.directory, "config", "user.email", "sory-code@localhost"])
+    await execFileAsync("git", ["-C", info.directory, "add", "-A"])
+    await execFileAsync("git", ["-C", info.directory, "commit", "-m", "Initial remote workspace snapshot"])
   },
   async remove(info) {
     if (info.directory) await rm(info.directory, { recursive: true, force: true })
