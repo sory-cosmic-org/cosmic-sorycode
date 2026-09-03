@@ -10,7 +10,11 @@
     "customConditions": ["browser"],
     "paths": {
       "@/*": ["./src/*"],
-      "@test/*": ["./test/*"]
+      "@test/*": ["./test/*"],
+      // Local Preview: resolve the generated embedded web UI when running
+      // from source. The file itself is produced by `bun run build`
+      // (packages/app) plus the generator used for Replit previews.
+      "opencode-web-ui.gen.ts": ["./opencode-web-ui.gen.ts"]
     }
   }
 }

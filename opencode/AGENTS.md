@@ -443,15 +443,18 @@ exclu (`desktopFileTreeOpen`, `hidden md:flex`, onglet fichiers réservé
 - `app typecheck` OK, suite unit sans nouvelle défaillance ;
 - cette section est mise à jour avant l’unité suivante.
 
-**Résultat :** terminée côté code, non vérifiée en Preview (l’UI servie
-est figée au build : `opencode-web-ui.gen.ts` ; il faut rebuild l’app +
-redémarrer `Start OpenCode`). Fichiers : nouveau
-`pages/session/mobile-files-drawer.tsx`, prop optionnelle
+**Résultat :** terminée côté code, vérifiée servie en local sur serveur
+temporaire (plus de proxy prod : le bundle contient le drawer). Fichiers :
+nouveau `pages/session/mobile-files-drawer.tsx`, prop optionnelle
 `SessionHeader({ onOpenFiles })`, câblage dans `session.tsx`,
-1 clé i18n. Tests : app typecheck OK, unit 723 pass / 1 fail (parité
-i18n pré-existante). Prochaine unité : pointeur provider-par-projet +
-`LocalProvider` aligné sur `worktree`, puis badge statut dans le futur
-manager workspace.
+1 clé i18n. Pour voir le bouton en Preview : `OPENCODE_CHANNEL=dev
+bun run build` dans `packages/app`, génération de
+`packages/opencode/opencode-web-ui.gen.ts` (952 fichiers, non commité,
+résolu via un `paths` ajouté au `tsconfig` de `packages/opencode`),
+puis redémarrer `Start OpenCode`. Tests : app typecheck OK, unit
+723 pass / 1 fail (parité i18n pré-existante). Prochaine unité :
+pointeur provider-par-projet + `LocalProvider` aligné sur `worktree`,
+puis badge statut dans le futur manager workspace.
 
 ### Installer les dépendances
 
