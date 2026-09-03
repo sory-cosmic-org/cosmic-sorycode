@@ -76,6 +76,14 @@ import type {
   FindTextResponses,
   FormatterStatusErrors,
   FormatterStatusResponses,
+  GitBranchesListErrors,
+  GitBranchesListResponses,
+  GitIdentityGetErrors,
+  GitIdentityGetResponses,
+  GitPipelinesListErrors,
+  GitPipelinesListResponses,
+  GitRepositoriesListErrors,
+  GitRepositoriesListResponses,
   GlobalConfigGetErrors,
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
@@ -387,12 +395,16 @@ import type {
   V2SkillListResponses,
   VcsApplyErrors,
   VcsApplyResponses,
+  VcsCommitErrors,
+  VcsCommitResponses,
   VcsDiffErrors,
   VcsDiffRawErrors,
   VcsDiffRawResponses,
   VcsDiffResponses,
   VcsGetErrors,
   VcsGetResponses,
+  VcsPushErrors,
+  VcsPushResponses,
   VcsStatusErrors,
   VcsStatusResponses,
   WorktreeCreateErrors,
@@ -1382,6 +1394,156 @@ export class Global extends HeyApiClient {
   }
 }
 
+export class Identity extends HeyApiClient {
+  /**
+   * Get connected Git identity
+   *
+   * Get the GitHub identity associated with the connected Replit integration.
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GitIdentityGetResponses, GitIdentityGetErrors, ThrowOnError>({
+      url: "/git/identity",
+      ...options,
+    })
+  }
+}
+
+export class Repositories extends HeyApiClient {
+  /**
+   * List remote repositories
+   *
+   * List or search repositories available through a connected Git provider.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      provider?: "github" | "gitlab"
+      page?: string
+      perPage?: string
+      query?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "provider" },
+            { in: "query", key: "page" },
+            { in: "query", key: "perPage" },
+            { in: "query", key: "query" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<GitRepositoriesListResponses, GitRepositoriesListErrors, ThrowOnError>({
+      url: "/git/repositories",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Branches extends HeyApiClient {
+  /**
+   * List repository branches
+   *
+   * List branches for a remote repository.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      owner: string
+      repository: string
+      provider?: "github" | "gitlab"
+      page?: string
+      perPage?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "owner" },
+            { in: "path", key: "repository" },
+            { in: "query", key: "provider" },
+            { in: "query", key: "page" },
+            { in: "query", key: "perPage" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<GitBranchesListResponses, GitBranchesListErrors, ThrowOnError>({
+      url: "/git/repositories/{owner}/{repository}/branches",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Pipelines extends HeyApiClient {
+  /**
+   * List repository pipelines
+   *
+   * List recent CI workflow runs for a remote repository.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      owner: string
+      repository: string
+      provider?: "github" | "gitlab"
+      page?: string
+      perPage?: string
+      branch?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "owner" },
+            { in: "path", key: "repository" },
+            { in: "query", key: "provider" },
+            { in: "query", key: "page" },
+            { in: "query", key: "perPage" },
+            { in: "query", key: "branch" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<GitPipelinesListResponses, GitPipelinesListErrors, ThrowOnError>({
+      url: "/git/repositories/{owner}/{repository}/pipelines",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Git extends HeyApiClient {
+  private _identity?: Identity
+  get identity(): Identity {
+    return (this._identity ??= new Identity({ client: this.client }))
+  }
+
+  private _repositories?: Repositories
+  get repositories(): Repositories {
+    return (this._repositories ??= new Repositories({ client: this.client }))
+  }
+
+  private _branches?: Branches
+  get branches(): Branches {
+    return (this._branches ??= new Branches({ client: this.client }))
+  }
+
+  private _pipelines?: Pipelines
+  get pipelines(): Pipelines {
+    return (this._pipelines ??= new Pipelines({ client: this.client }))
+  }
+}
+
 export class Event extends HeyApiClient {
   /**
    * Subscribe to events
@@ -2147,6 +2309,73 @@ export class Vcs extends HeyApiClient {
         ...options?.headers,
         ...params.headers,
       },
+    })
+  }
+
+  /**
+   * Create VCS commit
+   *
+   * Stage current changes and create a commit in the current workspace.
+   */
+  public commit<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      message?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "message" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<VcsCommitResponses, VcsCommitErrors, ThrowOnError>({
+      url: "/vcs/commit",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Push VCS changes
+   *
+   * Push the current branch to its configured Git remote.
+   */
+  public push<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<VcsPushResponses, VcsPushErrors, ThrowOnError>({
+      url: "/vcs/push",
+      ...options,
+      ...params,
     })
   }
 
@@ -7100,6 +7329,11 @@ export class OpencodeClient extends HeyApiClient {
   private _global?: Global
   get global(): Global {
     return (this._global ??= new Global({ client: this.client }))
+  }
+
+  private _git?: Git
+  get git(): Git {
+    return (this._git ??= new Git({ client: this.client }))
   }
 
   private _event?: Event

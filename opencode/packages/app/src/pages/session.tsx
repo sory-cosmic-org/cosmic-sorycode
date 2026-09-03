@@ -71,6 +71,7 @@ import {
   SessionComposerRegion,
 } from "@/pages/session/composer"
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
+import { SessionGitActions } from "@/pages/session/git-actions"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -1173,15 +1174,20 @@ export default function Page() {
     }
 
     return (
-      <Select
-        options={changesOptions()}
-        current={reviewMode()}
-        label={changesLabel}
-        onSelect={(option) => option && view().review.setMode(option)}
-        variant="ghost"
-        size="small"
-        valueClass="text-14-medium"
-      />
+      <div class="flex items-center gap-1">
+        <Select
+          options={changesOptions()}
+          current={reviewMode()}
+          label={changesLabel}
+          onSelect={(option) => option && view().review.setMode(option)}
+          variant="ghost"
+          size="small"
+          valueClass="text-14-medium"
+        />
+        <Show when={sync().project?.vcs === "git" && reviewMode() === "git"}>
+          <SessionGitActions hasChanges={() => vcsQuery.isFetched && reviewDiffs().length > 0} onRefresh={refreshVcs} />
+        </Show>
+      </div>
     )
   }
 
@@ -1191,15 +1197,20 @@ export default function Page() {
     }
 
     return (
-      <SelectV2
-        appearance="inline"
-        options={changesOptions()}
-        current={reviewMode()}
-        label={changesLabel}
-        placement="bottom-start"
-        gutter={6}
-        onSelect={(option) => option && view().review.setMode(option)}
-      />
+      <div class="flex items-center gap-1">
+        <SelectV2
+          appearance="inline"
+          options={changesOptions()}
+          current={reviewMode()}
+          label={changesLabel}
+          placement="bottom-start"
+          gutter={6}
+          onSelect={(option) => option && view().review.setMode(option)}
+        />
+        <Show when={sync().project?.vcs === "git" && reviewMode() === "git"}>
+          <SessionGitActions hasChanges={() => vcsQuery.isFetched && reviewDiffs().length > 0} onRefresh={refreshVcs} />
+        </Show>
+      </div>
     )
   }
 

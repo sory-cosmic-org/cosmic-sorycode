@@ -1,0 +1,1 @@
+- [Client generation boundary](client-generation-boundary.md) — use the generated V2 server client for new instance-level session endpoints.

@@ -258,16 +258,19 @@ propre, push vers un remote bare local, remote `origin` et absence de remote.
 La validation HTTP est également terminée : les endpoints commit et push
 répondent avec leurs contrats de succès et d’erreur.
 
-#### Étape 1A.2 — Régénération du client API
+#### Étape 1A.2 — Régénération des clients API
 
 **Objectif avant implémentation :** mettre à jour les clients TypeScript après
 l’ajout des routes publiques `vcs/commit` et `vcs/push`, sans éditer les sorties
-générées à la main.
+générées à la main. La génération concerne le client générique et le SDK V2
+utilisé par l’application.
 
 **Périmètre prévu :**
 
-- installer uniquement les dépendances Bun manquantes de `packages/client` ;
+- installer uniquement les dépendances Bun manquantes de `packages/client` et
+  `packages/sdk/js` ;
 - lancer `bun run generate` depuis `packages/client` ;
+- lancer le pipeline officiel `bun run build` depuis `packages/sdk/js` ;
 - vérifier que les types et méthodes client correspondent aux routes serveur ;
 - ne pas modifier les contrats générés manuellement.
 
@@ -281,6 +284,14 @@ générées à la main.
 **Résultat :** terminée. Les dépendances de `packages/client` ont été
 reconstruites, `bun run generate` réussit et le test d’identité des contrats
 client passe. Aucun fichier généré n’a été édité manuellement.
+
+La génération V2 a ensuite nécessité les dépendances du package serveur :
+`bun dev generate` ne démarre pas tant que le preload `@opentui/solid/preload`
+n’est pas lié. La reconstruction ciblée a d’abord rencontré `node-gyp` absent
+du PATH pendant l’installation native de `tree-sitter-powershell`; les liens Bun
+ont finalement été reconstruits avec les scripts d’installation désactivés,
+puis le pipeline officiel V2 a réussi. Les sorties générées contiennent les
+contrats `vcs/commit` et `vcs/push`.
 
 #### Étape 1B — Actions Git dans l’interface existante
 
@@ -305,8 +316,16 @@ existants, après consultation du statut Git.
 - le client envoie le vrai contrat généré ;
 - le résultat de chaque mutation est visible sans rechargement manuel ;
 - les erreurs serveur sont affichées sans credential ni sortie Git sensible ;
-- les tests frontend ou une vérification équivalente passent ;
+- le build et le typecheck frontend passent ; les tests serveur VCS/HTTP ciblés
+  passent également ;
 - cette section est mise à jour avant la prochaine étape Git/CI.
+
+**Résultat :** terminée. Le panneau Review Git expose Commit et Push pour le
+workspace courant. Commit ouvre un dialogue de message, les mutations utilisent
+le SDK V2 généré, les boutons affichent leur état de chargement, les toasts
+confirment les succès ou affichent les erreurs, et le diff est invalidé après
+mutation. Le dépôt propre reste visible via l’état existant « No uncommitted
+changes yet » et désactive Commit. Les textes ajoutés passent par l’i18n.
 
 ### Installer les dépendances
 

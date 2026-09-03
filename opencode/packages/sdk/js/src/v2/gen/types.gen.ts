@@ -2029,6 +2029,15 @@ export type Config = {
   }
 }
 
+export type RemoteGitError = {
+  name: "RemoteGitError"
+  data: {
+    provider: "github" | "gitlab"
+    message: string
+    status?: number
+  }
+}
+
 export type Model = {
   id: string
   providerID: string
@@ -2333,6 +2342,15 @@ export type VcsApplyError = {
   data: {
     message: string
     reason: "non-git" | "not-clean"
+  }
+}
+
+export type VcsOperationError = {
+  name: "VcsOperationError"
+  data: {
+    message: string
+    action: "commit" | "push"
+    reason: "non-git" | "nothing-to-commit" | "no-remote" | "failed"
   }
 }
 
@@ -7386,6 +7404,184 @@ export type GlobalUpgradeResponses = {
 
 export type GlobalUpgradeResponse = GlobalUpgradeResponses[keyof GlobalUpgradeResponses]
 
+export type GitIdentityGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/git/identity"
+}
+
+export type GitIdentityGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitIdentityGetError = GitIdentityGetErrors[keyof GitIdentityGetErrors]
+
+export type GitIdentityGetResponses = {
+  /**
+   * Connected GitHub identity
+   */
+  200: {
+    id: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    login: string
+    name: string
+    avatarUrl: string
+    url: string
+  }
+}
+
+export type GitIdentityGetResponse = GitIdentityGetResponses[keyof GitIdentityGetResponses]
+
+export type GitRepositoriesListData = {
+  body?: never
+  path?: never
+  query?: {
+    provider?: "github" | "gitlab"
+    page?: string
+    perPage?: string
+    query?: string
+  }
+  url: "/git/repositories"
+}
+
+export type GitRepositoriesListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitRepositoriesListError = GitRepositoriesListErrors[keyof GitRepositoriesListErrors]
+
+export type GitRepositoriesListResponses = {
+  /**
+   * Remote repositories
+   */
+  200: {
+    items: Array<{
+      id: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      provider: "github" | "gitlab"
+      owner: string
+      name: string
+      fullName: string
+      description: string
+      url: string
+      private: boolean
+      defaultBranch: string
+      updatedAt: string
+    }>
+    page: number
+    perPage: number
+    hasNext: boolean
+  }
+}
+
+export type GitRepositoriesListResponse = GitRepositoriesListResponses[keyof GitRepositoriesListResponses]
+
+export type GitBranchesListData = {
+  body?: never
+  path: {
+    owner: string
+    repository: string
+  }
+  query?: {
+    provider?: "github" | "gitlab"
+    page?: string
+    perPage?: string
+  }
+  url: "/git/repositories/{owner}/{repository}/branches"
+}
+
+export type GitBranchesListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitBranchesListError = GitBranchesListErrors[keyof GitBranchesListErrors]
+
+export type GitBranchesListResponses = {
+  /**
+   * Repository branches
+   */
+  200: {
+    items: Array<{
+      name: string
+      protected: boolean
+    }>
+    page: number
+    perPage: number
+    hasNext: boolean
+  }
+}
+
+export type GitBranchesListResponse = GitBranchesListResponses[keyof GitBranchesListResponses]
+
+export type GitPipelinesListData = {
+  body?: never
+  path: {
+    owner: string
+    repository: string
+  }
+  query?: {
+    provider?: "github" | "gitlab"
+    page?: string
+    perPage?: string
+    branch?: string
+  }
+  url: "/git/repositories/{owner}/{repository}/pipelines"
+}
+
+export type GitPipelinesListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitPipelinesListError = GitPipelinesListErrors[keyof GitPipelinesListErrors]
+
+export type GitPipelinesListResponses = {
+  /**
+   * Repository CI pipelines
+   */
+  200: {
+    items: Array<{
+      id: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+      name: string
+      status: string
+      conclusion: string
+      url: string
+      updatedAt: string
+    }>
+    page: number
+    perPage: number
+    hasNext: boolean
+  }
+}
+
+export type GitPipelinesListResponse = GitPipelinesListResponses[keyof GitPipelinesListResponses]
+
 export type EventSubscribeData = {
   body?: never
   path?: never
@@ -8282,6 +8478,72 @@ export type VcsApplyResponses = {
 }
 
 export type VcsApplyResponse = VcsApplyResponses[keyof VcsApplyResponses]
+
+export type VcsCommitData = {
+  body?: {
+    message: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/commit"
+}
+
+export type VcsCommitErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type VcsCommitError = VcsCommitErrors[keyof VcsCommitErrors]
+
+export type VcsCommitResponses = {
+  /**
+   * VCS commit created
+   */
+  200: {
+    committed: true
+    hash: string
+    branch: string
+  }
+}
+
+export type VcsCommitResponse = VcsCommitResponses[keyof VcsCommitResponses]
+
+export type VcsPushData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/push"
+}
+
+export type VcsPushErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type VcsPushError = VcsPushErrors[keyof VcsPushErrors]
+
+export type VcsPushResponses = {
+  /**
+   * VCS changes pushed
+   */
+  200: {
+    pushed: true
+    branch: string
+    remote: string
+  }
+}
+
+export type VcsPushResponse = VcsPushResponses[keyof VcsPushResponses]
 
 export type CommandListData = {
   body?: never
