@@ -1,11 +1,15 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f610c7be-1b42-4e33-a4d8-71defed3aa3b",
+  "id": "6745da9a-7a93-402e-b854-f8b88ff56789",
   "prevIds": [
-    "f14a9b18-8207-487e-a3d3-227e629ba9ad"
+    "f610c7be-1b42-4e33-a4d8-71defed3aa3b"
   ],
   "ddl": [
+    {
+      "name": "workspace_secret",
+      "entityType": "tables"
+    },
     {
       "name": "workspace",
       "entityType": "tables"
@@ -84,6 +88,36 @@
     },
     {
       "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "table": "workspace_secret"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "key",
+      "entityType": "columns",
+      "table": "workspace_secret"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "value",
+      "entityType": "columns",
+      "table": "workspace_secret"
+    },
+    {
+      "type": "text",
       "notNull": false,
       "autoincrement": false,
       "default": null,
@@ -159,6 +193,16 @@
       "default": "'running'",
       "generated": null,
       "name": "status",
+      "entityType": "columns",
+      "table": "workspace"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "codespace_name",
       "entityType": "columns",
       "table": "workspace"
     },
@@ -1494,6 +1538,21 @@
     },
     {
       "columns": [
+        "workspace_id"
+      ],
+      "tableTo": "workspace",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_workspace_secret_workspace_id_workspace_id_fk",
+      "entityType": "fks",
+      "table": "workspace_secret"
+    },
+    {
+      "columns": [
         "project_id"
       ],
       "tableTo": "project",
@@ -1686,6 +1745,16 @@
       "name": "fk_session_share_session_id_session_id_fk",
       "entityType": "fks",
       "table": "session_share"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "key"
+      ],
+      "nameExplicit": false,
+      "name": "workspace_secret_pk",
+      "entityType": "pks",
+      "table": "workspace_secret"
     },
     {
       "columns": [

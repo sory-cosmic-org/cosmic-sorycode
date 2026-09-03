@@ -5,6 +5,15 @@ export default {
   up(tx) {
     return Effect.gen(function* () {
       yield* tx.run(`
+        CREATE TABLE \`workspace_secret\` (
+          \`workspace_id\` text NOT NULL,
+          \`key\` text NOT NULL,
+          \`value\` text NOT NULL,
+          CONSTRAINT \`workspace_secret_pk\` PRIMARY KEY(\`workspace_id\`, \`key\`),
+          CONSTRAINT \`fk_workspace_secret_workspace_id_workspace_id_fk\` FOREIGN KEY (\`workspace_id\`) REFERENCES \`workspace\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`workspace\` (
           \`id\` text PRIMARY KEY,
           \`type\` text NOT NULL,
@@ -14,6 +23,7 @@ export default {
           \`extra\` text,
           \`project_id\` text NOT NULL,
           \`status\` text DEFAULT 'running' NOT NULL,
+          \`codespace_name\` text,
           \`time_used\` integer NOT NULL,
           CONSTRAINT \`fk_workspace_project_id_project_id_fk\` FOREIGN KEY (\`project_id\`) REFERENCES \`project\`(\`id\`) ON DELETE CASCADE
         );

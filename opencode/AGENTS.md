@@ -528,6 +528,45 @@ quel par le toast via `connectMessage` existant). Tests : 2 nouveaux cas
 trop gros : affichage de progression du snapshot, puis `clone` partiel
 (`--filter=blob:none`) au lieu du téléchargement blob par blob.
 
+#### Étape 5 — Provider GitHub Codespaces réel (plan § codespaces)
+
+**Contexte :** comme VS Code, Sory Code ne doit pas cloner/télécharger le
+dépôt : GitHub prépare l’environnement (le Codespace) et on y travaille
+directement. L’API REST ne sert qu’aux métadonnées et au cycle de vie
+(list/create/start/stop), jamais au transfert de fichiers. Le proxy distant
+existant (`Target remote`, `WorkspaceRoutingMiddleware`, `runInWorkspace`)
+rend cela possible sans toucher agent/tools/chat/terminal.
+
+**Phase A — Client API + persistance (cette étape) :**
+
+- nouveau `packages/opencode/src/git/codespaces.ts` : client officiel
+  (`list`, `listForRepository`, `get`, `create`, `start`, `stop`,
+  `remove`, `listMachines`, `listDevcontainers`, `tokenScopes`) via
+  token stocké (`Auth`, jamais connecteur Replit) ;
+- erreurs 401/403/404/422 mappées en messages clairs (scope `codespace`
+  manquant expliqué, jamais de JSON brut), états GitHub mappés vers
+  `running/stopped/starting/stopping/provisioning/failed/deleted/unknown`
+  (jamais de statut inventé) ;
+- `forwardedPortUrl(name, port)` : URL stable `https://NOM-PORT.app.github.dev` ;
+- persistance via pipeline officiel : colonne `workspace.codespace_name`
+  (liaison non secrète) + table `workspace_secret(workspace_id, key)`
+  (mots de passe serveur distant, cascade delete, jamais exposée au
+  frontend) — migration `20260903133643_workspace_codespace_binding`,
+  `--check` propre ;
+- périmètre : aucun changement de contrat (pas de routes, pas de SDK),
+  aucun changement UI, `remote-github` et snapshot legacy inchangés.
+
+**Résultat :** `codespaces.test.ts` 10 pass (fetch stubbé, zéro réseau :
+cycle de vie, mapping d’états, erreurs 403/404, scopes, port URL).
+`opencode typecheck` : zéro nouvelle erreur (fichier typé avec `R`
+honnête `Auth.Service`) ; `core typecheck` OK.
+
+**Phase B (suivante) :** routes serveur + adapter `github-codespaces`
+(`target()` → remote URL + Basic, boucle sync SSE, start/stop/refresh,
+suppression explicite) + snippet devcontainer Sory Code.
+**Phase C :** sélecteur provider-par-projet + UI Codespace.
+**Phase D :** audit mobile + 8 tests de parcours.
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :
