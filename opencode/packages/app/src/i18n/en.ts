@@ -716,6 +716,7 @@ export const dict = {
   "session.files.selectToOpen": "Select a file to open",
   "session.files.all": "All files",
   "session.files.empty": "No files",
+  "session.files.title": "Files",
   "session.files.binaryContent": "Binary file (content cannot be displayed)",
 
   "session.messages.renderEarlier": "Render earlier messages",

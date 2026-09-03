@@ -137,7 +137,7 @@ const showRequestError = (language: ReturnType<typeof useLanguage>, err: unknown
   })
 }
 
-export function SessionHeader() {
+export function SessionHeader(props: { onOpenFiles?: () => void }) {
   const layout = useLayout()
   const command = useCommand()
   const server = useServer()
@@ -444,6 +444,21 @@ export function SessionHeader() {
                       <Tooltip placement="bottom" value={language.t("status.popover.trigger")}>
                         <StatusPopover />
                       </Tooltip>
+                    </Show>
+                    <Show when={props.onOpenFiles}>
+                      <div class="flex items-center shrink-0 md:hidden">
+                        <Tooltip placement="bottom" value={language.t("session.files.title")}>
+                          <Button
+                            variant="ghost"
+                            class="titlebar-icon w-8 h-6 p-0 box-border shrink-0"
+                            onClick={() => props.onOpenFiles?.()}
+                            aria-label={language.t("session.files.title")}
+                            aria-haspopup="dialog"
+                          >
+                            <Icon size="small" name="file-tree" class="text-icon-weak" />
+                          </Button>
+                        </Tooltip>
+                      </div>
                     </Show>
                     <TooltipKeybind
                       title={language.t("command.terminal.toggle")}

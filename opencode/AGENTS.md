@@ -415,6 +415,44 @@ HTTP workspace/control-plane 10 pass, `core typecheck` OK. Prochaine
 unité : affichage du statut + drawer Fichiers mobile, puis pointeur
 provider-par-projet et `LocalProvider` aligné sur `worktree`.
 
+#### Étape 3 — Drawer Fichiers mobile (plan-adoption §8-10)
+
+**Objectif avant implémentation :** rendre l’explorateur réellement
+accessible sous 768px, où le panneau latéral desktop est structurellement
+exclu (`desktopFileTreeOpen`, `hidden md:flex`, onglet fichiers réservé
+`isDesktop()`), sans toucher au desktop ni dupliquer l’arbre.
+
+**Périmètre prévu :**
+
+- bouton Fichiers mobile uniquement (`md:hidden`) dans l’en-tête de
+  session, à côté du terminal ; desktop inchangé ;
+- `Drawer` existant (`@corvu/drawer`, même pattern que `help-button`) avec
+  le `FileTree` existant sur le vrai filesystem du workspace ;
+- sélection = ouverture d’onglet réelle (`tabs().open` + `file.load` +
+  `setActive`), fermeture du drawer après choix, état vide géré ;
+- côté RTL : `side` miroir comme `help-button`, CSS logique uniquement,
+  chemins déjà isolés par `FileTree` ;
+- textes via i18n (`session.files.title`) ; pas de raccourci desktop sur
+  le bouton mobile (l’action drawer n’est pas `fileTree.toggle`) ;
+- pas de badge statut workspace : aucune liste de workspaces
+  expérimentaux n’existe dans l’UI, ce sera l’unité « manager workspace ».
+
+**Critères de fin :**
+
+- aucun changement visuel ou comportemental sur desktop ;
+- `app typecheck` OK, suite unit sans nouvelle défaillance ;
+- cette section est mise à jour avant l’unité suivante.
+
+**Résultat :** terminée côté code, non vérifiée en Preview (l’UI servie
+est figée au build : `opencode-web-ui.gen.ts` ; il faut rebuild l’app +
+redémarrer `Start OpenCode`). Fichiers : nouveau
+`pages/session/mobile-files-drawer.tsx`, prop optionnelle
+`SessionHeader({ onOpenFiles })`, câblage dans `session.tsx`,
+1 clé i18n. Tests : app typecheck OK, unit 723 pass / 1 fail (parité
+i18n pré-existante). Prochaine unité : pointeur provider-par-projet +
+`LocalProvider` aligné sur `worktree`, puis badge statut dans le futur
+manager workspace.
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :

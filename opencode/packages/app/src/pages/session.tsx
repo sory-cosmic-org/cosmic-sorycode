@@ -83,6 +83,7 @@ import {
   sessionPanelWidthMax,
 } from "@/pages/session/session-panel-width"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { SessionMobileFilesDrawer } from "@/pages/session/mobile-files-drawer"
 import { sessionPanelLayout } from "@/pages/session/session-panel-layout"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
 import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
@@ -1108,6 +1109,16 @@ export default function Page() {
 
   const fileTreeTab = () => layout.fileTree.tab()
   const setFileTreeTab = (value: "changes" | "all") => layout.fileTree.setTab(value)
+
+  // Mobile-only file explorer: the desktop side panel is gated behind
+  // min-width:768px, so small screens open the same FileTree in a drawer.
+  const [mobileFilesOpen, setMobileFilesOpen] = createSignal(false)
+  const openMobileFile = (path: string) => {
+    const next = normalizeTab(file.tab(path))
+    tabs().open(next)
+    file.load(path)
+    tabs().setActive(next)
+  }
 
   const [tree, setTree] = createStore({
     reviewScroll: undefined as HTMLDivElement | undefined,
@@ -2259,7 +2270,8 @@ export default function Page() {
 
   return (
     <SessionRouteFrame>
-      <SessionHeader />
+      <SessionHeader onOpenFiles={() => setMobileFilesOpen(true)} />
+      <SessionMobileFilesDrawer open={mobileFilesOpen} onOpenChange={setMobileFilesOpen} onSelect={openMobileFile} />
       <div
         ref={panelRow}
         class="flex-1 min-h-0 flex flex-col md:flex-row"
