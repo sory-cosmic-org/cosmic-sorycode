@@ -6,6 +6,8 @@ import type { RemoteGitSelection } from "@/components/dialog-select-remote-repos
 
 const workspaceBarEnabled = import.meta.env.VITE_OPENCODE_CHANNEL !== "prod"
 
+export type WorkspaceAdapterType = "local" | "github-codespaces"
+
 export function resolveNewSessionWorktree(input: {
   enabled: boolean
   selected?: string
@@ -38,6 +40,7 @@ export function createNewSessionWorkspaceController() {
   const serverSync = useServerSync()
   const [worktree, setWorktree] = createSignal<string>()
   const [remote, setRemote] = createSignal<RemoteGitSelection>()
+  const [adapterType, setAdapterType] = createSignal<WorkspaceAdapterType>("local")
   const visible = createMemo(() => workspaceBarEnabled && sync().project?.vcs === "git")
   const value = createMemo(() =>
     resolveNewSessionWorktree({
@@ -64,6 +67,10 @@ export function createNewSessionWorkspaceController() {
       set: (worktree: string) =>
         setWorktree(normalizeNewSessionWorktree(worktree, sdk().directory, sync().project?.worktree)),
     },
+    adapter: {
+      type: adapterType,
+      set: setAdapterType,
+    },
     remote: {
       value: remote,
       set: setRemote,
@@ -71,9 +78,10 @@ export function createNewSessionWorkspaceController() {
       create: async () => {
         const selection = remote()
         if (!selection) return
+        const type = adapterType() === "github-codespaces" ? "github-codespaces" : "remote-github"
         const result = await sdk().client.experimental.workspace.create({
           directory: sdk().directory,
-          type: "remote-github",
+          type,
           branch: selection.branch.name,
           extra: {
             provider: selection.repository.provider,

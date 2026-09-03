@@ -13,6 +13,7 @@ import {
   DialogSelectRemoteRepository,
   PromptRemoteRepositoryButton,
 } from "@/components/dialog-select-remote-repository"
+import { CodespaceManagementPanel } from "@/components/codespace-management-panel"
 import {
   PromptProjectAddButton,
   PromptProjectSelector,
@@ -26,7 +27,7 @@ import { useProviders } from "@/hooks/use-providers"
 import { NEW_SESSION_CONTENT_WIDTH } from "@/pages/session/new-session-layout"
 import { Persist, persisted } from "@/utils/persist"
 import type { NewSessionDraftController } from "./new-session-draft-controller"
-import type { NewSessionWorkspaceController } from "./new-session-workspace-controller"
+import type { NewSessionWorkspaceController, WorkspaceAdapterType } from "./new-session-workspace-controller"
 
 const providerTipDismissalDuration = 30 * 24 * 60 * 60 * 1000
 
@@ -36,6 +37,7 @@ export function NewSessionView(props: {
   workspace: NewSessionWorkspaceController
 }) {
   const dialog = useDialog()
+  const language = useLanguage()
   const openRemoteRepository = () => {
     void dialog.show(() => <DialogSelectRemoteRepository onSelect={props.workspace.remote.set} />)
   }
@@ -57,6 +59,10 @@ export function NewSessionView(props: {
               <Show when={props.project.selected()}>
                 <div class="flex min-h-7 min-w-0 flex-col items-center justify-center gap-0 text-v2-text-text-faint sm:flex-row">
                   <PromptProjectSelector controller={props.project} placement="bottom" />
+                  <AdapterTypeSelector
+                    value={props.workspace.adapter.type()}
+                    onChange={props.workspace.adapter.set}
+                  />
                   <PromptRemoteRepositoryButton
                     selection={props.workspace.remote.value()}
                     onClick={openRemoteRepository}
@@ -78,12 +84,37 @@ export function NewSessionView(props: {
                   </Show>
                 </div>
               </Show>
+              <Show when={props.workspace.adapter.type() === "github-codespaces" && props.workspace.remote.value()}>
+                <CodespaceManagementPanel repository={props.workspace.remote.value()!.repository} />
+              </Show>
             </div>
           </div>
         </div>
         <ProviderTip />
       </div>
     </div>
+  )
+}
+
+function AdapterTypeSelector(props: {
+  value: WorkspaceAdapterType
+  onChange: (type: WorkspaceAdapterType) => void
+}) {
+  const language = useLanguage()
+  const options: { value: WorkspaceAdapterType; label: string }[] = [
+    { value: "local", label: language.t("adapter.local") },
+    { value: "github-codespaces", label: language.t("adapter.codespaces") },
+  ]
+  return (
+    <select
+      class="h-7 rounded-sm bg-transparent px-1 text-[13px] text-v2-text-text-faint outline-none hover:text-v2-text-text-muted"
+      value={props.value}
+      onChange={(e) => props.onChange(e.currentTarget.value as WorkspaceAdapterType)}
+    >
+      {options.map((opt) => (
+        <option value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
   )
 }
 

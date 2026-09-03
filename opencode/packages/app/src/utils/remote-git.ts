@@ -109,3 +109,65 @@ export async function gitDisconnect(server: ServerSDK) {
     throw new Error(connectMessage(body) ?? `GitHub disconnect failed (${response.status})`)
   }
 }
+
+export type Codespace = {
+  name: string
+  displayName: string | null
+  state: string
+  runtime: string
+  repository: string
+  branch: string
+  machine: string
+  webUrl: string | null
+  lastUsedAt: string | null
+}
+
+export function listCodespacesForRepository(
+  server: ServerSDK,
+  repository: RemoteGitRepository,
+) {
+  return request<Codespace[]>(
+    server,
+    `/git/repositories/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/codespaces`,
+    {},
+  )
+}
+
+export function listAllCodespaces(server: ServerSDK) {
+  return request<Codespace[]>(server, "/git/codespaces", {})
+}
+
+export async function startCodespace(server: ServerSDK, name: string) {
+  const response = await fetch(endpoint(server, `/git/codespaces/${encodeURIComponent(name)}/start`, {}), {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => "")
+    throw new Error(connectMessage(body) ?? `Failed to start codespace (${response.status})`)
+  }
+  return (await response.json()) as Codespace
+}
+
+export async function stopCodespace(server: ServerSDK, name: string) {
+  const response = await fetch(endpoint(server, `/git/codespaces/${encodeURIComponent(name)}/stop`, {}), {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => "")
+    throw new Error(connectMessage(body) ?? `Failed to stop codespace (${response.status})`)
+  }
+  return (await response.json()) as Codespace
+}
+
+export async function deleteCodespace(server: ServerSDK, name: string) {
+  const response = await fetch(endpoint(server, `/git/codespaces/${encodeURIComponent(name)}`, {}), {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => "")
+    throw new Error(connectMessage(body) ?? `Failed to delete codespace (${response.status})`)
+  }
+}

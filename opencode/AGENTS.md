@@ -104,15 +104,13 @@ Sory Code en cours.
 
 ### Reprise exacte du travail
 
-1. Relier les opérations Git distantes (fetch, commit, push), les pipelines et
-   les logs CI/CD à l’interface existante.
-2. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
+1. Ajouter les Pull Requests GitHub et les Merge Requests GitLab avec des
+   permissions explicites et auditables.
+2. Afficher les pipelines CI/CD, leurs états et leurs logs dans l’interface.
+3. Ajouter GitLab avec le même contrat lorsque le connecteur GitLab sera
    connecté.
-3. Vérifier les parcours mobile/Android sans créer une seconde application.
-
-Le workspace distant GitHub est maintenant vérifié par des tests ciblés ; ne pas
-commencer GitLab ou Android avant d’avoir traité la limite de typecheck et la
-prochaine tranche Git/CI.
+4. Ajouter le snippet devcontainer Sory Code pour les Codespaces.
+5. Vérifier les parcours mobile/Android sans créer une seconde application.
 
 ### Synthèse complète de l’état actuel
 
@@ -124,7 +122,7 @@ prochaine tranche Git/CI.
   identité, dépôts, branches et pipelines.
 - Le frontend permet de sélectionner un dépôt GitHub puis une branche depuis le
   parcours existant de nouvelle session.
-- Le control plane possède un adapter `remote-github`.
+- Le control plane possède un adapter `remote-github` et `github-codespaces`.
 - Le dépôt sélectionné est téléchargé côté serveur sous forme de snapshot de
   fichiers, puis écrit dans un workspace isolé :
   `.opencode/remote-workspaces/<workspace-id>`.
@@ -133,21 +131,22 @@ prochaine tranche Git/CI.
 - La session OpenCode existante est ouverte sur ce workspace. Le chat, les
   tools, le terminal, l’éditeur et les sessions restent ceux d’OpenCode.
 - Les créations incomplètes sont nettoyées : dossier partiel et ligne persistée
-  en base sont supprimés si le téléchargement, l’écriture ou Git échoue.
+  en base sont supprimées si le téléchargement, l’écriture ou Git échoue.
 - Les chemins dangereux qui sortent du workspace sont refusés.
 - Les tests ciblés couvrent la configuration, la création, la branche, le
   remote, le commit initial et les nettoyages d’erreur.
+- Un sélecteur de provider (Local / GitHub Codespaces) est disponible dans le
+  dialogue de nouvelle session.
+- Un panneau de gestion des codespaces (état, start/stop/delete) s’affiche
+  quand le provider GitHub Codespaces est sélectionné.
 
 #### Ce qui manque
 
 - Rétablir un typecheck complet exploitable. `tsgo` est actuellement tué par
   `SIGKILL` et `tsc` dépasse la mémoire disponible avant d’émettre un
   diagnostic.
-- Ajouter les opérations Git utilisateur dans le workspace : `fetch`,
-  changement/création de branche, `commit` et `push`.
 - Ajouter les Pull Requests GitHub et les Merge Requests GitLab avec des
   permissions explicites et auditables.
-- Relier les opérations Git à l’interface de session existante.
 - Afficher les pipelines CI/CD, leurs états et leurs logs dans l’interface.
 - Lire et exploiter les workflows `.github/workflows` et `.gitlab-ci.yml`.
 - Connecter GitLab uniquement lorsqu’une intégration GitLab réelle sera
@@ -160,16 +159,19 @@ prochaine tranche Git/CI.
   fichier → terminal → diff.
 - Vérifier le support mobile/Android. Aucune application Expo/React Native
   identifiable n’est actuellement présente dans le dépôt.
+- Ajouter le snippet devcontainer Sory Code pour les Codespaces
+  (`.devcontainer/devcontainer.json`).
 
 #### Position actuelle
 
 Le projet est à la fin de la première tranche fonctionnelle GitHub :
 
 ```text
-sélection du dépôt
+sélection du provider (Local / GitHub Codespaces)
+  → sélection du dépôt
   → sélection de la branche
   → workspace isolé
-  → snapshot des fichiers
+  → snapshot des fichiers ou remote Codespace
   → initialisation Git
   → session OpenCode existante
 ```
@@ -561,11 +563,28 @@ cycle de vie, mapping d’états, erreurs 403/404, scopes, port URL).
 `opencode typecheck` : zéro nouvelle erreur (fichier typé avec `R`
 honnête `Auth.Service`) ; `core typecheck` OK.
 
-**Phase B (suivante) :** routes serveur + adapter `github-codespaces`
-(`target()` → remote URL + Basic, boucle sync SSE, start/stop/refresh,
-suppression explicite) + snippet devcontainer Sory Code.
-**Phase C :** sélecteur provider-par-projet + UI Codespace.
+**Résultat :** terminé. Code :
+- `packages/opencode/src/control-plane/workspace-secret.ts` : Service mockable (`get/has/set/remove`) + async helpers (`getAsync/setAsync`) via `AppNodeBuilder` (pas `V1`), sans dépendance circulaire.
+- `packages/opencode/src/control-plane/adapters/codespaces.ts` : `createCodespacesAdapter()` — configure/create/remove/target. Réutilisation ou création de codespace (adopt running/starting/provisioning/stopped ; start si stopped ; poll jusqu'à running ; cleanup sur échec). `target()` → `{type:"remote", url, headers:{Authorization:Basic}}`. Service injectable `client/secrets/persist/pollIntervalMs`.
+- `packages/opencode/src/control-plane/adapters/index.ts` : registre `builtinAdapters` inclut `"github-codespaces"`.
+- `packages/opencode/src/server/routes/instance/httpapi/groups/git.ts` : 12 nouveaux endpoints (codespaces CRUD, machines, devcontainers, token-scopes, server-password set/status).
+- `packages/opencode/src/server/routes/instance/httpapi/handlers/git.ts` : 12 handlers avec `Codespaces` + `WorkspaceSecret` services injectés.
+- `packages/opencode/src/server/routes/instance/httpapi/server.ts` : `CodespacesNode` + `WorkspaceSecretNode` ajoutés à la couche.
+- SDK V2 régénéré (+852 lignes, ajouts seuls).
+
+Tests : `codespaces-adapter.test.ts` 11 pass (configure, reuse, start stopped, create+poll, no-token, cleanup on failure, target resolution, no-password rejection, remove-is-noop). `httpapi-codespaces.test.ts` 6 pass (list, get, create/start/stop/delete, machines/devcontainers/token-scopes, server-password set/status, 400 short password). `codespaces.test.ts` 10 pass (Phase A inchangé).
+
+Le snippet devcontainer sera créé à la phase C lors de l'intégration UI, au moment où le sélecteur provider-par-projet le rend visible.
+**Phase C :** sélecteur provider-par-projet + UI Codespace (prochaine étape).
 **Phase D :** audit mobile + 8 tests de parcours.
+
+**Résultat Phase C :** terminée côté code. Components :
+- `packages/app/src/pages/new-session/new-session-workspace-controller.ts` : `adapterType` signal (`"local" | "github-codespaces"`), `createRemote()` utilise le type sélectionné au lieu du `"remote-github"` hardcodé.
+- `packages/app/src/components/codespace-management-panel.tsx` : panneau de gestion des codespaces — liste les codespaces du dépôt sélectionné, affiche l'état (running/stopped/provisioning), boutons Start/Stop/Delete.
+- `packages/app/src/pages/new-session/new-session-view.tsx` : `AdapterTypeSelector` (sélect `<select>`) entre le sélecteur projet et le bouton repository, panneau codespace affiché quand `adapterType === "github-codespaces"` + repo sélectionné.
+- `packages/app/src/utils/remote-git.ts` : helpers `listCodespacesForRepository`, `listAllCodespaces`, `startCodespace`, `stopCodespace`, `deleteCodespace`.
+- `packages/app/src/i18n/en.ts` : 10 nouvelles clés `adapter.*` + `codespace.*`.
+- Tests : app 723 pass / 1 fail (parité i18n pré-existante), serveur 17 pass (adapter + HTTP codespace).
 
 ### Installer les dépendances
 

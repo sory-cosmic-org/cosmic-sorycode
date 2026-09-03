@@ -728,6 +728,17 @@ export const dict = {
   "remoteGit.connectedAs": "Connected as {login}",
   "remoteGit.disconnect": "Disconnect",
 
+  "adapter.local": "Local",
+  "adapter.codespaces": "GitHub Codespaces",
+
+  "codespace.panel.title": "Codespaces",
+  "codespace.panel.loading": "Loading...",
+  "codespace.panel.empty": "No codespaces found",
+  "codespace.panel.noCodespaces": "No codespaces for this repository",
+  "codespace.action.start": "Start",
+  "codespace.action.stop": "Stop",
+  "codespace.action.delete": "Delete",
+
   "session.messages.renderEarlier": "Render earlier messages",
   "session.messages.loadingEarlier": "Loading earlier messages...",
   "session.messages.loadEarlier": "Load earlier messages",
