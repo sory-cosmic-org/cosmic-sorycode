@@ -1,6 +1,7 @@
 import { ReplitConnectors } from "@replit/connectors-sdk"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Context, Effect, Layer } from "effect"
+import { Auth } from "@/auth"
 
 export type Provider = "github" | "gitlab"
 
@@ -78,6 +79,15 @@ export interface Interface {
     readonly page: number
     readonly perPage: number
   }) => Effect.Effect<PageResult<Pipeline>, RemoteGitProviderError>
+  readonly status: () => Effect.Effect<ConnectionStatus, RemoteGitProviderError>
+  readonly connect: (input: { readonly token: string }) => Effect.Effect<Identity, RemoteGitProviderError>
+  readonly disconnect: () => Effect.Effect<void, RemoteGitProviderError>
+}
+
+export type ConnectionStatus = {
+  readonly state: "connected" | "disconnected"
+  readonly login?: string
+  readonly source?: "token" | "connector"
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/RemoteGit") {}
@@ -111,35 +121,20 @@ export type RemoteRepositoryFile = {
 
 const sleep = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
-async function githubJson<T>(path: string, attempt = 0): Promise<T> {
-  const response = await connectors.proxy("github", path, {
-    method: "GET",
-    headers: {
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  })
-  if (!response.ok) {
-    const body = await response.text()
-    if (response.status === 429 && attempt < 2) {
-      const retryAfter = Number(response.headers.get("retry-after") ?? "1")
-      await sleep(Math.max(1000, retryAfter * 1000))
-      return githubJson<T>(path, attempt + 1)
-    }
-    throw new RemoteGitProviderError("github", response.status, body.slice(0, 300) || "GitHub request failed")
-  }
-  return (await response.json()) as T
-}
-
-export async function downloadRepositorySnapshot(input: {
-  readonly owner: string
-  readonly repository: string
-  readonly branch: string
-}) {
-  const ref = await githubJson<GithubRefResponse>(
+export async function downloadRepositorySnapshot(
+  input: {
+    readonly owner: string
+    readonly repository: string
+    readonly branch: string
+  },
+  opts?: { readonly token?: string },
+) {
+  const token = opts?.token ?? tokenFromEnv()
+  const json = <T>(path: string) => githubJson<T>(path, token)
+  const ref = await json<GithubRefResponse>(
     `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/git/ref/heads/${encodePath(input.branch)}`,
   )
-  const tree = await githubJson<GithubTreeResponse>(
+  const tree = await json<GithubTreeResponse>(
     `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/git/trees/${encodePath(ref.object.sha)}?recursive=1`,
   )
   if (tree.truncated) {
@@ -155,7 +150,7 @@ export async function downloadRepositorySnapshot(input: {
         if (normalized.startsWith("/") || normalized.split("/").includes("..")) {
           throw new RemoteGitProviderError("github", undefined, `Unsafe path returned by GitHub: ${item.path}`)
         }
-        const blob = await githubJson<GithubBlobResponse>(
+        const blob = await json<GithubBlobResponse>(
           `/repos/${encodePath(input.owner)}/${encodePath(input.repository)}/git/blobs/${encodePath(item.sha)}`,
         )
         if (blob.encoding !== "base64") {
@@ -222,12 +217,89 @@ class GithubRequestError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly retryAfter?: number,
   ) {
     super(message)
   }
 }
 
 const connectors = new ReplitConnectors()
+
+const GITHUB_AUTH_KEY = "github"
+const GITHUB_API = "https://api.github.com"
+const GITHUB_HEADERS = {
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+} as const
+
+function tokenFromAuthValue(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined
+  const record = value as { type?: unknown; key?: unknown }
+  if (record.type !== "api" || typeof record.key !== "string" || !record.key) return undefined
+  return record.key
+}
+
+// Reads a previously connected GitHub token without Effect services, for
+// plain async call paths (snapshot download, adapters). Never logs it.
+export function tokenFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  try {
+    const data = JSON.parse(env.OPENCODE_AUTH_CONTENT ?? "{}") as Record<string, unknown>
+    return tokenFromAuthValue(data[GITHUB_AUTH_KEY])
+  } catch {
+    return undefined
+  }
+}
+
+async function directFetch<T>(path: string, token: string): Promise<T> {
+  const response = await fetch(`${GITHUB_API}${path}`, {
+    method: "GET",
+    headers: { ...GITHUB_HEADERS, Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    throw new GithubRequestError(response.status, body.slice(0, 300), retryAfter(response))
+  }
+  return (await response.json()) as T
+}
+
+async function connectorFetch<T>(path: string): Promise<T> {
+  const response = await connectors.proxy("github", path, {
+    method: "GET",
+    headers: { ...GITHUB_HEADERS },
+  })
+  if (!response.ok) {
+    const body = await response.text()
+    throw new GithubRequestError(response.status, body.slice(0, 300), retryAfter(response))
+  }
+  return (await response.json()) as T
+}
+
+function retryAfter(response: { headers: { get(name: string): string | null } }) {
+  const value = Number(response.headers.get("retry-after") ?? "1")
+  return Number.isNaN(value) ? 1 : value
+}
+
+function toProviderError(error: unknown) {
+  if (error instanceof RemoteGitProviderError) return error
+  if (error instanceof GithubRequestError)
+    return new RemoteGitProviderError("github", error.status, error.message || "GitHub request failed")
+  return new RemoteGitProviderError("github", undefined, error instanceof Error ? error.message : String(error))
+}
+
+// Stored personal token first (works anywhere), Replit connector as
+// fallback (works where the integration is connected). Never throws
+// anything but RemoteGitProviderError, never includes the token.
+async function githubJson<T>(path: string, token?: string, attempt = 0): Promise<T> {
+  try {
+    return token ? await directFetch<T>(path, token) : await connectorFetch<T>(path)
+  } catch (error) {
+    if (error instanceof GithubRequestError && error.status === 429 && attempt < 2) {
+      await sleep(Math.max(1000, (error.retryAfter ?? 1) * 1000))
+      return githubJson<T>(path, token, attempt + 1)
+    }
+    throw toProviderError(error)
+  }
+}
 
 function encodePath(value: string) {
   return encodeURIComponent(value)
@@ -242,40 +314,34 @@ function pageResult<T>(items: readonly T[], input: PageInput, total?: number) {
   } satisfies PageResult<T>
 }
 
+const storedToken = Effect.fn("RemoteGit.storedToken")(function* () {
+  const auth = yield* Auth.Service
+  const value = yield* auth.get(GITHUB_AUTH_KEY).pipe(Effect.catch(() => Effect.succeed(undefined)))
+  return tokenFromAuthValue(value)
+})
+
 function request<T>(path: string) {
-  return Effect.tryPromise({
-    try: async () => {
-      const response = await connectors.proxy("github", path, {
-        method: "GET",
-        headers: {
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      })
-      if (!response.ok) {
-        const body = await response.text()
-        throw new GithubRequestError(response.status, body.slice(0, 300))
-      }
-      return (await response.json()) as T
-    },
-    catch: (error) => {
-      if (error instanceof GithubRequestError)
-        return new RemoteGitProviderError("github", error.status, error.message || "GitHub request failed")
-      return new RemoteGitProviderError("github", undefined, error instanceof Error ? error.message : String(error))
-    },
-  })
+  return Effect.flatMap(storedToken(), (token) =>
+    Effect.tryPromise({
+      try: () => githubJson<T>(path, token),
+      catch: toProviderError,
+    }),
+  )
+}
+
+function toIdentity(data: GithubUser): Identity {
+  return {
+    id: data.id,
+    login: data.login,
+    name: data.name,
+    avatarUrl: data.avatar_url,
+    url: data.html_url,
+  }
 }
 
 const service: Interface = {
   identity: Effect.fn("RemoteGit.identity")(function* () {
-    const data = yield* request<GithubUser>("/user")
-    return {
-      id: data.id,
-      login: data.login,
-      name: data.name,
-      avatarUrl: data.avatar_url,
-      url: data.html_url,
-    } satisfies Identity
+    return toIdentity(yield* request<GithubUser>("/user"))
   }),
   listRepositories: Effect.fn("RemoteGit.listRepositories")(function* (input) {
     const query = input.query?.trim()
@@ -348,8 +414,48 @@ const service: Interface = {
       data.total_count,
     )
   }),
+  status: Effect.fn("RemoteGit.status")(function* () {
+    const token = yield* storedToken()
+    const probe = yield* Effect.exit(request<GithubUser>("/user"))
+    if (probe._tag === "Success")
+      return { state: "connected", login: probe.value.login, source: token ? "token" : "connector" } as const
+    return { state: "disconnected" } as const
+  }),
+  connect: Effect.fn("RemoteGit.connect")(function* (input) {
+    const token = input.token.trim()
+    if (!token) return yield* Effect.fail(new RemoteGitProviderError("github", undefined, "GitHub token is required"))
+    const user = yield* Effect.tryPromise({
+      try: () => directFetch<GithubUser>("/user", token),
+      catch: (error) =>
+        error instanceof GithubRequestError && (error.status === 401 || error.status === 403)
+          ? new RemoteGitProviderError(
+              "github",
+              error.status,
+              "GitHub rejected this token. Create a token with the repo scope and try again.",
+            )
+          : toProviderError(error),
+    })
+    const auth = yield* Auth.Service
+    yield* auth.set(GITHUB_AUTH_KEY, { type: "api", key: token }).pipe(
+      Effect.mapError(
+        (error) => new RemoteGitProviderError("github", undefined, `Could not save the GitHub token: ${error.message}`),
+      ),
+    )
+    return toIdentity(user)
+  }),
+  disconnect: Effect.fn("RemoteGit.disconnect")(function* () {
+    const auth = yield* Auth.Service
+    yield* auth.remove(GITHUB_AUTH_KEY).pipe(
+      Effect.mapError(
+        (error) => new RemoteGitProviderError("github", undefined, `Could not remove the GitHub token: ${error.message}`),
+      ),
+    )
+  }),
 }
 
-const layer = Layer.succeed(Service, Service.of(service))
+const layer = Layer.effect(
+  Service,
+  Effect.map(Auth.Service, () => Service.of(service)),
+)
 
-export const node = LayerNode.make({ service: Service, layer, deps: [] })
+export const node = LayerNode.make({ service: Service, layer, deps: [Auth.node] })

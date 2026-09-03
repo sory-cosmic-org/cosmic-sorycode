@@ -719,6 +719,15 @@ export const dict = {
   "session.files.title": "Files",
   "session.files.binaryContent": "Binary file (content cannot be displayed)",
 
+  "remoteGit.connect.title": "Connect GitHub",
+  "remoteGit.connect.description": "Paste a personal access token with the repo scope. It is validated and stored on the server only.",
+  "remoteGit.connect.tokenLink": "Create a token on github.com",
+  "remoteGit.connect.tokenPlaceholder": "github_pat_...",
+  "remoteGit.connect.action": "Connect",
+  "remoteGit.connect.actionLoading": "Connecting...",
+  "remoteGit.connectedAs": "Connected as {login}",
+  "remoteGit.disconnect": "Disconnect",
+
   "session.messages.renderEarlier": "Render earlier messages",
   "session.messages.loadingEarlier": "Loading earlier messages...",
   "session.messages.loadEarlier": "Load earlier messages",

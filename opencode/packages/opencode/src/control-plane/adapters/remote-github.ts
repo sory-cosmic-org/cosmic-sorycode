@@ -3,7 +3,7 @@ import { dirname, join, resolve, sep } from "node:path"
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { Schema } from "effect"
-import { downloadRepositorySnapshot, type RemoteRepositoryFile } from "@/git/remote"
+import { downloadRepositorySnapshot, tokenFromEnv, type RemoteRepositoryFile } from "@/git/remote"
 import type { WorkspaceAdapter } from "../types"
 
 const execFileAsync = promisify(execFile)
@@ -23,7 +23,10 @@ function requireInstanceDirectory(context: Parameters<NonNullable<WorkspaceAdapt
 }
 
 type RemoteGithubAdapterOptions = {
-  downloadSnapshot?: (input: RemoteConfig) => Promise<readonly RemoteRepositoryFile[]>
+  downloadSnapshot?: (
+    input: RemoteConfig,
+    opts?: { readonly token?: string },
+  ) => Promise<readonly RemoteRepositoryFile[]>
 }
 
 export function createRemoteGithubAdapter(options: RemoteGithubAdapterOptions = {}): WorkspaceAdapter {
@@ -42,7 +45,7 @@ export function createRemoteGithubAdapter(options: RemoteGithubAdapterOptions = 
         directory,
       }
     },
-    async create(info) {
+    async create(info, env) {
       const config = decodeRemoteConfig(info.extra)
       if (!info.directory) throw new Error("GitHub workspace directory was not configured")
 
@@ -51,7 +54,11 @@ export function createRemoteGithubAdapter(options: RemoteGithubAdapterOptions = 
       try {
         await rm(info.directory, { recursive: true, force: true })
         await mkdir(info.directory, { recursive: true })
-        for (const file of await downloadSnapshot(config)) {
+        // A connected personal token (Auth store, forwarded through the
+        // workspace environment) works anywhere; otherwise the snapshot
+        // falls back to the Replit connector.
+        const token = tokenFromEnv({ ...process.env, OPENCODE_AUTH_CONTENT: env?.OPENCODE_AUTH_CONTENT })
+        for (const file of await downloadSnapshot(config, { token })) {
           const target = resolve(info.directory, file.path)
           if (target !== resolve(info.directory) && !target.startsWith(`${resolve(info.directory)}${sep}`)) {
             throw new Error(`Unsafe repository path: ${file.path}`)

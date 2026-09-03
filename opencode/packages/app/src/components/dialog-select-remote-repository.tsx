@@ -8,6 +8,9 @@ import { createEffect, createResource, createSignal, For, Show } from "solid-js"
 import { useLanguage } from "@/context/language"
 import { useServerSDK } from "@/context/server-sdk"
 import {
+  gitConnect,
+  gitConnectionStatus,
+  gitDisconnect,
   listRemoteBranches,
   listRemoteRepositories,
   type RemoteGitBranch,
@@ -47,10 +50,46 @@ export function DialogSelectRemoteRepository(props: { onSelect: (selection: Remo
   const [submittedSearch, setSubmittedSearch] = createSignal("")
   const [selectedRepository, setSelectedRepository] = createSignal<RemoteGitRepository>()
   const [selectedBranch, setSelectedBranch] = createSignal("")
-  const [repositories] = createResource(submittedSearch, (query) => listRemoteRepositories(server(), query))
+  const [token, setToken] = createSignal("")
+  const [connecting, setConnecting] = createSignal(false)
+  const [connectError, setConnectError] = createSignal<string>()
+  const [repositories, { refetch: refetchRepositories }] = createResource(submittedSearch, (query) =>
+    listRemoteRepositories(server(), query),
+  )
   const [branches] = createResource(selectedRepository, (repository) =>
     repository ? listRemoteBranches(server(), repository) : Promise.resolve(undefined),
   )
+  const [connection, { refetch: refetchConnection }] = createResource(() => gitConnectionStatus(server()))
+
+  const connect = async (event?: Event) => {
+    event?.preventDefault()
+    const value = token().trim()
+    if (!value || connecting()) return
+    setConnecting(true)
+    setConnectError(undefined)
+    try {
+      await gitConnect(server(), value)
+      setToken("")
+      await refetchConnection()
+      await refetchRepositories()
+    } catch (error) {
+      setConnectError(error instanceof Error ? error.message : language.t("common.requestFailed"))
+    } finally {
+      setConnecting(false)
+    }
+  }
+
+  const disconnect = async () => {
+    try {
+      await gitDisconnect(server())
+      await refetchConnection()
+      await refetchRepositories()
+    } catch (error) {
+      setConnectError(error instanceof Error ? error.message : language.t("common.requestFailed"))
+    }
+  }
+
+  const needsConnection = () => !!repositories.error && connection()?.state !== "connected"
 
   createEffect(() => {
     const repository = selectedRepository()
@@ -80,6 +119,58 @@ export function DialogSelectRemoteRepository(props: { onSelect: (selection: Remo
       </DialogHeader>
       <DividerV2 />
       <DialogBody class="flex min-h-0 flex-col gap-3">
+        <Show when={connection()?.state === "connected" && connection()?.login}>
+          {(login) => (
+            <div class="flex items-center gap-2 rounded-md border border-v2-border-border-muted px-3 py-2 text-[13px] text-v2-text-text-muted">
+              <IconV2 name="check" size="small" class="shrink-0" />
+              <span class="min-w-0 flex-1 truncate">{language.t("remoteGit.connectedAs", { login: login() })}</span>
+              <ButtonV2 variant="neutral" onClick={() => void disconnect()}>
+                {language.t("remoteGit.disconnect")}
+              </ButtonV2>
+            </div>
+          )}
+        </Show>
+        <Show when={needsConnection()}>
+          <form
+            class="flex min-h-0 flex-col gap-2 rounded-md border border-v2-border-border-muted p-3"
+            onSubmit={connect}
+          >
+            <div class="text-[13px] font-[530] text-v2-text-text-base">{language.t("remoteGit.connect.title")}</div>
+            <p class="text-[12px] leading-5 text-v2-text-text-muted">
+              {language.t("remoteGit.connect.description")}{" "}
+              <a
+                href="https://github.com/settings/tokens"
+                target="_blank"
+                rel="noreferrer"
+                class="underline underline-offset-2"
+              >
+                {language.t("remoteGit.connect.tokenLink")}
+              </a>
+            </p>
+            <div class="flex gap-2">
+              <TextInputV2
+                type="password"
+                value={token()}
+                autocomplete="off"
+                placeholder={language.t("remoteGit.connect.tokenPlaceholder")}
+                class="!w-full"
+                invalid={!!connectError()}
+                onInput={(event) => {
+                  setToken(event.currentTarget.value)
+                  if (connectError()) setConnectError(undefined)
+                }}
+              />
+              <ButtonV2 type="submit" variant="contrast" disabled={!token().trim() || connecting()}>
+                {connecting() ? language.t("remoteGit.connect.actionLoading") : language.t("remoteGit.connect.action")}
+              </ButtonV2>
+            </div>
+            <Show when={connectError()}>
+              <div class="text-[12px] text-v2-text-text-warning" role="alert">
+                {connectError()}
+              </div>
+            </Show>
+          </form>
+        </Show>
         <form class="flex gap-2" onSubmit={submitSearch}>
           <TextInputV2
             value={search()}

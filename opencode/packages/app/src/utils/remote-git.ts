@@ -13,9 +13,23 @@ export type RemoteGitRepository = {
   updatedAt: string | null
 }
 
+export type RemoteGitIdentity = {
+  id: number
+  login: string
+  name: string | null
+  avatarUrl: string | null
+  url: string
+}
+
 export type RemoteGitBranch = {
   name: string
   protected: boolean
+}
+
+export type RemoteGitConnectionStatus = {
+  state: "connected" | "disconnected"
+  login?: string
+  source?: "token" | "connector"
 }
 
 type PageResult<T> = {
@@ -39,9 +53,19 @@ async function request<T>(server: ServerSDK, path: string, params: Record<string
   })
   if (!response.ok) {
     const body = await response.text().catch(() => "")
-    throw new Error(body || `Remote Git request failed (${response.status})`)
+    throw new Error(connectMessage(body) ?? `Remote Git request failed (${response.status})`)
   }
   return (await response.json()) as T
+}
+
+function connectMessage(body: string): string | undefined {
+  try {
+    const data = JSON.parse(body) as { data?: { message?: unknown } }
+    if (typeof data.data?.message === "string" && data.data.message) return data.data.message
+    return undefined
+  } catch {
+    return body || undefined
+  }
 }
 
 export function listRemoteRepositories(server: ServerSDK, query: string) {
@@ -59,4 +83,29 @@ export function listRemoteBranches(server: ServerSDK, repository: RemoteGitRepos
     `/git/repositories/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.name)}/branches`,
     { provider: repository.provider, page: "1", perPage: "100" },
   )
+}
+
+export function gitConnectionStatus(server: ServerSDK) {
+  return request<RemoteGitConnectionStatus>(server, "/git/status", {})
+}
+
+export async function gitConnect(server: ServerSDK, token: string) {
+  const response = await fetch(endpoint(server, "/git/connect", {}), {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+  if (!response.ok) {
+    const body = await response.text().catch(() => "")
+    throw new Error(connectMessage(body) ?? `GitHub connect failed (${response.status})`)
+  }
+  return (await response.json()) as RemoteGitIdentity
+}
+
+export async function gitDisconnect(server: ServerSDK) {
+  const response = await fetch(endpoint(server, "/git/disconnect", {}), { method: "POST" })
+  if (!response.ok) {
+    const body = await response.text().catch(() => "")
+    throw new Error(connectMessage(body) ?? `GitHub disconnect failed (${response.status})`)
+  }
 }

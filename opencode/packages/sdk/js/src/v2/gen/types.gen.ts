@@ -7583,6 +7583,101 @@ export type GitPipelinesListResponses = {
 
 export type GitPipelinesListResponse = GitPipelinesListResponses[keyof GitPipelinesListResponses]
 
+export type GitStatusGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/git/status"
+}
+
+export type GitStatusGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type GitStatusGetError = GitStatusGetErrors[keyof GitStatusGetErrors]
+
+export type GitStatusGetResponses = {
+  /**
+   * Git provider connection status
+   */
+  200: {
+    state: "connected" | "disconnected"
+    login?: string
+    source?: "token" | "connector"
+  }
+}
+
+export type GitStatusGetResponse = GitStatusGetResponses[keyof GitStatusGetResponses]
+
+export type GitConnectData = {
+  body?: {
+    token: string
+  }
+  path?: never
+  query?: never
+  url: "/git/connect"
+}
+
+export type GitConnectErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitConnectError = GitConnectErrors[keyof GitConnectErrors]
+
+export type GitConnectResponses = {
+  /**
+   * Connected GitHub identity
+   */
+  200: {
+    id: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    login: string
+    name: string
+    avatarUrl: string
+    url: string
+  }
+}
+
+export type GitConnectResponse = GitConnectResponses[keyof GitConnectResponses]
+
+export type GitDisconnectData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/git/disconnect"
+}
+
+export type GitDisconnectErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitDisconnectError = GitDisconnectErrors[keyof GitDisconnectErrors]
+
+export type GitDisconnectResponses = {
+  /**
+   * GitHub token removed
+   */
+  200: boolean
+}
+
+export type GitDisconnectResponse = GitDisconnectResponses[keyof GitDisconnectResponses]
+
 export type EventSubscribeData = {
   body?: never
   path?: never

@@ -56,6 +56,16 @@ const PageResult = <T extends Schema.Schema<unknown>>(item: T) =>
     hasNext: Schema.Boolean,
   })
 
+export const GitConnectInput = Schema.Struct({
+  token: Schema.String.check(Schema.isPattern(/\S/)),
+})
+
+export const GitConnectionStatus = Schema.Struct({
+  state: Schema.Literals(["connected", "disconnected"]),
+  login: Schema.optional(Schema.String),
+  source: Schema.optional(Schema.Literals(["token", "connector"])),
+})
+
 export class ApiRemoteGitError extends Schema.ErrorClass<ApiRemoteGitError>("RemoteGitError")(
   {
     name: Schema.Literal("RemoteGitError"),
@@ -126,6 +136,38 @@ export const GitApi = HttpApi.make("git").add(
           identifier: "git.pipelines.list",
           summary: "List repository pipelines",
           description: "List recent CI workflow runs for a remote repository.",
+        }),
+      ),
+      HttpApiEndpoint.get("status", `${root}/status`, {
+        success: described(GitConnectionStatus, "Git provider connection status"),
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "git.status.get",
+          summary: "Get Git connection status",
+          description:
+            "Check whether GitHub API calls can be made with a stored personal token or the server integration.",
+        }),
+      ),
+      HttpApiEndpoint.post("connect", `${root}/connect`, {
+        payload: GitConnectInput,
+        success: described(Identity, "Connected GitHub identity"),
+        error: ApiRemoteGitError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "git.connect",
+          summary: "Connect GitHub with a token",
+          description:
+            "Validate a GitHub personal token (repo scope) and store it server-side. The token itself is never returned.",
+        }),
+      ),
+      HttpApiEndpoint.post("disconnect", `${root}/disconnect`, {
+        success: described(Schema.Boolean, "GitHub token removed"),
+        error: ApiRemoteGitError,
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "git.disconnect",
+          summary: "Disconnect GitHub",
+          description: "Remove the stored GitHub personal token from the server.",
         }),
       ),
     )

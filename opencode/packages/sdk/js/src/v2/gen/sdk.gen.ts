@@ -78,12 +78,18 @@ import type {
   FormatterStatusResponses,
   GitBranchesListErrors,
   GitBranchesListResponses,
+  GitConnectErrors,
+  GitConnectResponses,
+  GitDisconnectErrors,
+  GitDisconnectResponses,
   GitIdentityGetErrors,
   GitIdentityGetResponses,
   GitPipelinesListErrors,
   GitPipelinesListResponses,
   GitRepositoriesListErrors,
   GitRepositoriesListResponses,
+  GitStatusGetErrors,
+  GitStatusGetResponses,
   GlobalConfigGetErrors,
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
@@ -1526,7 +1532,57 @@ export class Pipelines extends HeyApiClient {
   }
 }
 
+export class Status extends HeyApiClient {
+  /**
+   * Get Git connection status
+   *
+   * Check whether GitHub API calls can be made with a stored personal token or the server integration.
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GitStatusGetResponses, GitStatusGetErrors, ThrowOnError>({
+      url: "/git/status",
+      ...options,
+    })
+  }
+}
+
 export class Git extends HeyApiClient {
+  /**
+   * Connect GitHub with a token
+   *
+   * Validate a GitHub personal token (repo scope) and store it server-side. The token itself is never returned.
+   */
+  public connect<ThrowOnError extends boolean = false>(
+    parameters?: {
+      token?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "body", key: "token" }] }])
+    return (options?.client ?? this.client).post<GitConnectResponses, GitConnectErrors, ThrowOnError>({
+      url: "/git/connect",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Disconnect GitHub
+   *
+   * Remove the stored GitHub personal token from the server.
+   */
+  public disconnect<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).post<GitDisconnectResponses, GitDisconnectErrors, ThrowOnError>({
+      url: "/git/disconnect",
+      ...options,
+    })
+  }
+
   private _identity?: Identity
   get identity(): Identity {
     return (this._identity ??= new Identity({ client: this.client }))
@@ -1545,6 +1601,11 @@ export class Git extends HeyApiClient {
   private _pipelines?: Pipelines
   get pipelines(): Pipelines {
     return (this._pipelines ??= new Pipelines({ client: this.client }))
+  }
+
+  private _status?: Status
+  get status(): Status {
+    return (this._status ??= new Status({ client: this.client }))
   }
 }
 

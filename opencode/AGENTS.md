@@ -456,6 +456,53 @@ puis redémarrer `Start OpenCode`. Tests : app typecheck OK, unit
 pointeur provider-par-projet + `LocalProvider` aligné sur `worktree`,
 puis badge statut dans le futur manager workspace.
 
+#### Étape 4 — Connexion GitHub par token personnel (plan-adoption §18-19)
+
+**Objectif avant implémentation :** permettre « Connect GitHub » depuis
+le dialogue dépôt, sans Replit, sans OAuth App, sans token au frontend.
+Le connecteur Replit reste un repli là où il est connecté.
+
+**Périmètre prévu :**
+
+- token saisi une fois dans l’UI, validé via `GET /user`, stocké dans
+  `Auth` serveur (`auth.json`, clé `github`, type `api`) ; jamais
+  retourné, loggé ou exposé ;
+- transport GitHub : token stocké d’abord (`Bearer`), connecteur Replit
+  sinon, erreur explicite sinon ; snapshot et appels API suivent la même
+  règle (adapter lit le token via `OPENCODE_AUTH_CONTENT`) ;
+- routes `GET /git/status` (toujours 200 : `connected/login/source` ou
+  `disconnected`), `POST /git/connect` (`Identity`, 401 mappé en message
+  clair), `POST /git/disconnect` ;
+- UI : panneau Connect (lien `github.com/settings/tokens`, champ
+  password, erreur lisible, Retry via rechargement) visible quand la
+  liste échoue sans connexion ; bandeau « Connected as » + Disconnect ;
+- textes ajoutés via i18n (`remoteGit.*`) ; dispositifs existants
+  (listes, snapshot, nettoyage) inchangés ;
+- régénérer SDK V2 officiel + rebuild app + régénérer l’UI embarquée
+  locale pour le Preview ;
+- pas encore de Device Flow (amélioration possible sans réécriture).
+
+**Critères de fin :**
+
+- aucun appel réseau réel dans les tests (fetch confiné, Auth mémoire) ;
+- vérification HTTP en direct sur serveur temporaire (statut, refus
+  vide, 401 mappé) ;
+- suite ciblée verte des deux côtés, typecheck app OK ;
+- cette section est mise à jour avant l’unité suivante.
+
+**Résultat :** terminée côté code. `git/remote.ts` : `tokenFromEnv`,
+`directFetch`/`connectorFetch`, `githubJson(token)`, service
+`status/connect/disconnect` adossé à `Auth` (`deps: [Auth.node]`).
+Adapter `remote-github` transmet le token d’env au snapshot. UI :
+panneau Connect + bandeau connecté dans `DialogSelectRemoteRepository`.
+Tests : `remote-auth.test.ts` 9 pass (validation, stockage, Bearer,
+statuts, disconnect), adapter+git 14 pass, HTTP global/control-plane
+5 pass, app unit 723 pass / 1 fail (parité i18n pré-existante). SDK V2
+régénéré (endpoints git uniquement en plus). App rebuildée + UI
+embarquée régénérée (952 fichiers, non commitée). Reste à l’utilisateur :
+redémarrer `Start OpenCode`, créer un token `repo` sur github.com, le
+coller dans le dialogue.
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :

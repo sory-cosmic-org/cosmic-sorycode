@@ -51,11 +51,27 @@ export const gitHandlers = HttpApiBuilder.group(RootHttpApi, "git", (handlers) =
         .pipe(Effect.mapError(toApiError))
     })
 
+    const status = Effect.fn("GitHttpApi.status")(function* () {
+      return yield* remoteGit.status()
+    })
+
+    const connect = Effect.fn("GitHttpApi.connect")(function* (ctx: { payload: { token: string } }) {
+      return yield* remoteGit.connect(ctx.payload).pipe(Effect.mapError(toApiError))
+    })
+
+    const disconnect = Effect.fn("GitHttpApi.disconnect")(function* () {
+      yield* remoteGit.disconnect().pipe(Effect.mapError(toApiError))
+      return true
+    })
+
     return handlers
       .handle("identity", identity)
       .handle("listRepositories", listRepositories)
       .handle("listBranches", listBranches)
       .handle("listPipelines", listPipelines)
+      .handle("status", status)
+      .handle("connect", connect)
+      .handle("disconnect", disconnect)
   }),
 )
 
