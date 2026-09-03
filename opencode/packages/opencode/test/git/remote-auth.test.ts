@@ -118,6 +118,44 @@ describe("RemoteGit token auth", () => {
     }),
   )
 
+  it.effect("maps a rate-limited token to a retry message without leaking the body", () =>
+    Effect.gen(function* () {
+      stubFetch(
+        () =>
+          new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
+            status: 403,
+            headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1788439200" },
+          }),
+      )
+      const remote = yield* RemoteGit
+
+      const exit = yield* Effect.exit(remote.connect({ token: "tok" }))
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(String(exit)).toContain("GitHub API rate limit exceeded")
+      expect(String(exit)).toContain("UTC")
+      expect(String(exit)).not.toContain("API rate limit exceeded for user")
+    }),
+  )
+
+  it.effect("maps a rate-limited api call the same way", () =>
+    Effect.gen(function* () {
+      stubFetch(
+        () =>
+          new Response(JSON.stringify({ message: "API rate limit exceeded" }), {
+            status: 403,
+            headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1788439200" },
+          }),
+      )
+      const remote = yield* RemoteGit
+      const auth = yield* Auth.Service
+      yield* auth.set("github", { type: "api", key: "tok" })
+
+      const exit = yield* Effect.exit(remote.listRepositories({ page: 1, perPage: 30 }))
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(String(exit)).toContain("GitHub API rate limit exceeded")
+    }),
+  )
+
   it.effect("api calls use the stored token as bearer", () =>
     Effect.gen(function* () {
       stubFetch((url) => (url.endsWith("/user") ? jsonResponse(user) : jsonResponse([])))

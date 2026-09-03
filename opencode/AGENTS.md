@@ -503,6 +503,31 @@ embarquée régénérée (952 fichiers, non commitée). Reste à l’utilisateur
 redémarrer `Start OpenCode`, créer un token `repo` sur github.com, le
 coller dans le dialogue.
 
+#### Étape 4.1 — Erreurs snapshot lisibles (rate limit GitHub)
+
+**Constat avant implémentation :** après connexion du token, la liste
+fonctionne mais la création du workspace échoue : chaque snapshot
+télécharge des centaines de blobs (1 requête chacun), 5 tentatives cute;
+le quota a été épuisé (`API rate limit exceeded for user ID ...`) et le
+toast affichait le JSON brut du connecteur. Le bouton d’envoi restait
+gelé car la session pointait sur un workspace jamais créé.
+
+**Périmètre :**
+
+- détecter le quota épuisé via `403` + `x-ratelimit-remaining: 0`
+  (direct et connecteur), message `Try again after HH:MM UTC` avec
+  `x-ratelimit-reset`, sans fuir le corps brut ;
+- `connect` priorise ce message sur « token rejeté » ;
+- nettoyer les dossiers fantômes laissés par les créations interrompues ;
+- aucune limite arbitraire de taille de dépôt, aucun changement d’API.
+
+**Résultat :** `GithubRequestError` porte `rateLimitReset`,
+`toProviderError`/`connect` mappent vers le message clair (remonté tel
+quel par le toast via `connectMessage` existant). Tests : 2 nouveaux cas
+403 + headers, `remote-auth` 11 pass. Prochaine étape si le dépôt reste
+trop gros : affichage de progression du snapshot, puis `clone` partiel
+(`--filter=blob:none`) au lieu du téléchargement blob par blob.
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :

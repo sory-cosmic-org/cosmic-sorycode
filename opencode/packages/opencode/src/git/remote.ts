@@ -218,6 +218,7 @@ class GithubRequestError extends Error {
     readonly status: number,
     message: string,
     readonly retryAfter?: number,
+    readonly rateLimitReset?: number,
   ) {
     super(message)
   }
@@ -257,7 +258,7 @@ async function directFetch<T>(path: string, token: string): Promise<T> {
   })
   if (!response.ok) {
     const body = await response.text()
-    throw new GithubRequestError(response.status, body.slice(0, 300), retryAfter(response))
+    throw new GithubRequestError(response.status, body.slice(0, 300), retryAfter(response), rateLimitReset(response))
   }
   return (await response.json()) as T
 }
@@ -269,20 +270,40 @@ async function connectorFetch<T>(path: string): Promise<T> {
   })
   if (!response.ok) {
     const body = await response.text()
-    throw new GithubRequestError(response.status, body.slice(0, 300), retryAfter(response))
+    throw new GithubRequestError(response.status, body.slice(0, 300), retryAfter(response), rateLimitReset(response))
   }
   return (await response.json()) as T
 }
 
-function retryAfter(response: { headers: { get(name: string): string | null } }) {
+type HeaderReader = { headers: { get(name: string): string | null } }
+
+function retryAfter(response: HeaderReader) {
   const value = Number(response.headers.get("retry-after") ?? "1")
   return Number.isNaN(value) ? 1 : value
 }
 
+// GitHub signals an exhausted quota with 403 + x-ratelimit-remaining: 0.
+// Surfacing the reset time beats leaking the raw API body into toasts.
+function rateLimitReset(response: HeaderReader & { status: number }) {
+  if (response.status !== 403) return undefined
+  if (response.headers.get("x-ratelimit-remaining") !== "0") return undefined
+  const reset = Number(response.headers.get("x-ratelimit-reset") ?? "")
+  return Number.isNaN(reset) ? undefined : reset
+}
+
+function rateLimitMessage(reset?: number) {
+  if (!reset) return "GitHub API rate limit exceeded. Try again in a few minutes."
+  const at = new Date(reset * 1000).toISOString().slice(11, 16)
+  return `GitHub API rate limit exceeded. Try again after ${at} UTC.`
+}
+
 function toProviderError(error: unknown) {
   if (error instanceof RemoteGitProviderError) return error
-  if (error instanceof GithubRequestError)
+  if (error instanceof GithubRequestError) {
+    if (error.rateLimitReset !== undefined)
+      return new RemoteGitProviderError("github", error.status, rateLimitMessage(error.rateLimitReset))
     return new RemoteGitProviderError("github", error.status, error.message || "GitHub request failed")
+  }
   return new RemoteGitProviderError("github", undefined, error instanceof Error ? error.message : String(error))
 }
 
@@ -426,14 +447,17 @@ const service: Interface = {
     if (!token) return yield* Effect.fail(new RemoteGitProviderError("github", undefined, "GitHub token is required"))
     const user = yield* Effect.tryPromise({
       try: () => directFetch<GithubUser>("/user", token),
-      catch: (error) =>
-        error instanceof GithubRequestError && (error.status === 401 || error.status === 403)
-          ? new RemoteGitProviderError(
-              "github",
-              error.status,
-              "GitHub rejected this token. Create a token with the repo scope and try again.",
-            )
-          : toProviderError(error),
+      catch: (error) => {
+        if (error instanceof GithubRequestError && error.rateLimitReset !== undefined)
+          return new RemoteGitProviderError("github", error.status, rateLimitMessage(error.rateLimitReset))
+        if (error instanceof GithubRequestError && (error.status === 401 || error.status === 403))
+          return new RemoteGitProviderError(
+            "github",
+            error.status,
+            "GitHub rejected this token. Create a token with the repo scope and try again.",
+          )
+        return toProviderError(error)
+      },
     })
     const auth = yield* Auth.Service
     yield* auth.set(GITHUB_AUTH_KEY, { type: "api", key: token }).pipe(
