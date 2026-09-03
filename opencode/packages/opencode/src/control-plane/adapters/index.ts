@@ -2,10 +2,12 @@ import type { ProjectV2 } from "@opencode-ai/core/project"
 import type { WorkspaceAdapter, WorkspaceAdapterEntry } from "../types"
 import { WorktreeAdapter } from "./worktree"
 import { RemoteGithubAdapter } from "./remote-github"
+import { CodespacesAdapter } from "./codespaces"
 
 const BUILTIN: Record<string, WorkspaceAdapter> = {
   worktree: WorktreeAdapter,
   "remote-github": RemoteGithubAdapter,
+  "github-codespaces": CodespacesAdapter,
 }
 
 const state = new Map<ProjectV2.ID, Map<string, WorkspaceAdapter>>()

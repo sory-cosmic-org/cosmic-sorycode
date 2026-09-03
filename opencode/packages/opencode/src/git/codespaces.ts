@@ -76,7 +76,7 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Codespaces") {}
 
-type GithubCodespaceResponse = {
+export type GithubCodespaceResponse = {
   name: string
   display_name: string | null
   state: string
@@ -127,7 +127,7 @@ const GITHUB_HEADERS = {
   "X-GitHub-Api-Version": "2022-11-28",
 } as const
 
-function toRuntime(state: string): CodespaceRuntime {
+export function toRuntime(state: string): CodespaceRuntime {
   switch (state) {
     case "Available":
       return "running"
@@ -154,7 +154,7 @@ function toRuntime(state: string): CodespaceRuntime {
   }
 }
 
-function toCodespace(data: GithubCodespaceResponse): Codespace {
+export function toCodespace(data: GithubCodespaceResponse): Codespace {
   return {
     name: data.name,
     displayName: data.display_name,
@@ -192,6 +192,16 @@ function toProviderError(error: unknown) {
     return new RemoteGitProviderError("github", error.status, message)
   }
   return new RemoteGitProviderError("github", undefined, error instanceof Error ? error.message : String(error))
+}
+
+// Plain transport for non-Effect call sites (workspace adapters). Takes an
+// explicit token, throws RemoteGitProviderError only, never logs the token.
+export async function requestWithToken<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
+  try {
+    return (await request<T>(method, path, token, body)).data
+  } catch (error) {
+    throw toProviderError(error)
+  }
 }
 
 async function request<T>(method: string, path: string, token: string, body?: unknown): Promise<{ data: T; scopes: string }> {

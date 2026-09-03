@@ -7678,6 +7678,470 @@ export type GitDisconnectResponses = {
 
 export type GitDisconnectResponse = GitDisconnectResponses[keyof GitDisconnectResponses]
 
+export type GitCodespacesListData = {
+  body?: never
+  path?: never
+  query?: {
+    repositoryID?: string
+  }
+  url: "/git/codespaces"
+}
+
+export type GitCodespacesListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesListError = GitCodespacesListErrors[keyof GitCodespacesListErrors]
+
+export type GitCodespacesListResponses = {
+  /**
+   * GitHub Codespaces
+   */
+  200: Array<{
+    name: string
+    displayName: string
+    state: string
+    runtime: "running" | "stopped" | "starting" | "stopping" | "provisioning" | "failed" | "deleted" | "unknown"
+    repository: string
+    branch: string
+    machine: string
+    webUrl: string
+    lastUsedAt: string
+  }>
+}
+
+export type GitCodespacesListResponse = GitCodespacesListResponses[keyof GitCodespacesListResponses]
+
+export type GitCodespacesListByRepositoryData = {
+  body?: never
+  path: {
+    owner: string
+    repository: string
+  }
+  query?: never
+  url: "/git/repositories/{owner}/{repository}/codespaces"
+}
+
+export type GitCodespacesListByRepositoryErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesListByRepositoryError =
+  GitCodespacesListByRepositoryErrors[keyof GitCodespacesListByRepositoryErrors]
+
+export type GitCodespacesListByRepositoryResponses = {
+  /**
+   * Repository codespaces
+   */
+  200: Array<{
+    name: string
+    displayName: string
+    state: string
+    runtime: "running" | "stopped" | "starting" | "stopping" | "provisioning" | "failed" | "deleted" | "unknown"
+    repository: string
+    branch: string
+    machine: string
+    webUrl: string
+    lastUsedAt: string
+  }>
+}
+
+export type GitCodespacesListByRepositoryResponse =
+  GitCodespacesListByRepositoryResponses[keyof GitCodespacesListByRepositoryResponses]
+
+export type GitCodespacesCreateData = {
+  body?: {
+    branch: string
+    machine?: string
+    devcontainerPath?: string
+    displayName?: string
+  }
+  path: {
+    owner: string
+    repository: string
+  }
+  query?: never
+  url: "/git/repositories/{owner}/{repository}/codespaces"
+}
+
+export type GitCodespacesCreateErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesCreateError = GitCodespacesCreateErrors[keyof GitCodespacesCreateErrors]
+
+export type GitCodespacesCreateResponses = {
+  /**
+   * Created Codespace
+   */
+  200: {
+    name: string
+    displayName: string
+    state: string
+    runtime: "running" | "stopped" | "starting" | "stopping" | "provisioning" | "failed" | "deleted" | "unknown"
+    repository: string
+    branch: string
+    machine: string
+    webUrl: string
+    lastUsedAt: string
+  }
+}
+
+export type GitCodespacesCreateResponse = GitCodespacesCreateResponses[keyof GitCodespacesCreateResponses]
+
+export type GitCodespacesDeleteData = {
+  body?: never
+  path: {
+    name: string
+  }
+  query?: never
+  url: "/git/codespaces/{name}"
+}
+
+export type GitCodespacesDeleteErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesDeleteError = GitCodespacesDeleteErrors[keyof GitCodespacesDeleteErrors]
+
+export type GitCodespacesDeleteResponses = {
+  /**
+   * Codespace deleted
+   */
+  200: boolean
+}
+
+export type GitCodespacesDeleteResponse = GitCodespacesDeleteResponses[keyof GitCodespacesDeleteResponses]
+
+export type GitCodespacesGetData = {
+  body?: never
+  path: {
+    name: string
+  }
+  query?: never
+  url: "/git/codespaces/{name}"
+}
+
+export type GitCodespacesGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesGetError = GitCodespacesGetErrors[keyof GitCodespacesGetErrors]
+
+export type GitCodespacesGetResponses = {
+  /**
+   * GitHub Codespace
+   */
+  200: {
+    name: string
+    displayName: string
+    state: string
+    runtime: "running" | "stopped" | "starting" | "stopping" | "provisioning" | "failed" | "deleted" | "unknown"
+    repository: string
+    branch: string
+    machine: string
+    webUrl: string
+    lastUsedAt: string
+  }
+}
+
+export type GitCodespacesGetResponse = GitCodespacesGetResponses[keyof GitCodespacesGetResponses]
+
+export type GitCodespacesStartData = {
+  body?: never
+  path: {
+    name: string
+  }
+  query?: never
+  url: "/git/codespaces/{name}/start"
+}
+
+export type GitCodespacesStartErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesStartError = GitCodespacesStartErrors[keyof GitCodespacesStartErrors]
+
+export type GitCodespacesStartResponses = {
+  /**
+   * Starting Codespace
+   */
+  200: {
+    name: string
+    displayName: string
+    state: string
+    runtime: "running" | "stopped" | "starting" | "stopping" | "provisioning" | "failed" | "deleted" | "unknown"
+    repository: string
+    branch: string
+    machine: string
+    webUrl: string
+    lastUsedAt: string
+  }
+}
+
+export type GitCodespacesStartResponse = GitCodespacesStartResponses[keyof GitCodespacesStartResponses]
+
+export type GitCodespacesStopData = {
+  body?: never
+  path: {
+    name: string
+  }
+  query?: never
+  url: "/git/codespaces/{name}/stop"
+}
+
+export type GitCodespacesStopErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesStopError = GitCodespacesStopErrors[keyof GitCodespacesStopErrors]
+
+export type GitCodespacesStopResponses = {
+  /**
+   * Stopping Codespace
+   */
+  200: {
+    name: string
+    displayName: string
+    state: string
+    runtime: "running" | "stopped" | "starting" | "stopping" | "provisioning" | "failed" | "deleted" | "unknown"
+    repository: string
+    branch: string
+    machine: string
+    webUrl: string
+    lastUsedAt: string
+  }
+}
+
+export type GitCodespacesStopResponse = GitCodespacesStopResponses[keyof GitCodespacesStopResponses]
+
+export type GitCodespacesMachinesListData = {
+  body?: never
+  path: {
+    owner: string
+    repository: string
+  }
+  query?: never
+  url: "/git/repositories/{owner}/{repository}/codespaces/machines"
+}
+
+export type GitCodespacesMachinesListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesMachinesListError = GitCodespacesMachinesListErrors[keyof GitCodespacesMachinesListErrors]
+
+export type GitCodespacesMachinesListResponses = {
+  /**
+   * Available machines
+   */
+  200: Array<{
+    name: string
+    displayName: string
+    cpus: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    memoryInBytes: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    storageInBytes: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+    prebuildAvailability: string
+  }>
+}
+
+export type GitCodespacesMachinesListResponse =
+  GitCodespacesMachinesListResponses[keyof GitCodespacesMachinesListResponses]
+
+export type GitCodespacesDevcontainersListData = {
+  body?: never
+  path: {
+    owner: string
+    repository: string
+  }
+  query?: never
+  url: "/git/repositories/{owner}/{repository}/codespaces/devcontainers"
+}
+
+export type GitCodespacesDevcontainersListErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitCodespacesDevcontainersListError =
+  GitCodespacesDevcontainersListErrors[keyof GitCodespacesDevcontainersListErrors]
+
+export type GitCodespacesDevcontainersListResponses = {
+  /**
+   * Devcontainer configurations
+   */
+  200: Array<{
+    path: string
+    name: string
+    displayName: string
+  }>
+}
+
+export type GitCodespacesDevcontainersListResponse =
+  GitCodespacesDevcontainersListResponses[keyof GitCodespacesDevcontainersListResponses]
+
+export type GitTokenScopesGetData = {
+  body?: never
+  path?: never
+  query?: never
+  url: "/git/token-scopes"
+}
+
+export type GitTokenScopesGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitTokenScopesGetError = GitTokenScopesGetErrors[keyof GitTokenScopesGetErrors]
+
+export type GitTokenScopesGetResponses = {
+  /**
+   * Token scopes
+   */
+  200: Array<string>
+}
+
+export type GitTokenScopesGetResponse = GitTokenScopesGetResponses[keyof GitTokenScopesGetResponses]
+
+export type GitWorkspaceServerPasswordGetData = {
+  body?: never
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/git/workspaces/{id}/server-password"
+}
+
+export type GitWorkspaceServerPasswordGetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitWorkspaceServerPasswordGetError =
+  GitWorkspaceServerPasswordGetErrors[keyof GitWorkspaceServerPasswordGetErrors]
+
+export type GitWorkspaceServerPasswordGetResponses = {
+  /**
+   * Server password presence
+   */
+  200: {
+    set: boolean
+  }
+}
+
+export type GitWorkspaceServerPasswordGetResponse =
+  GitWorkspaceServerPasswordGetResponses[keyof GitWorkspaceServerPasswordGetResponses]
+
+export type GitWorkspaceServerPasswordSetData = {
+  body?: {
+    workspaceID: string
+    password: string
+  }
+  path: {
+    id: string
+  }
+  query?: never
+  url: "/git/workspaces/{id}/server-password"
+}
+
+export type GitWorkspaceServerPasswordSetErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+  /**
+   * RemoteGitError
+   */
+  502: RemoteGitError
+}
+
+export type GitWorkspaceServerPasswordSetError =
+  GitWorkspaceServerPasswordSetErrors[keyof GitWorkspaceServerPasswordSetErrors]
+
+export type GitWorkspaceServerPasswordSetResponses = {
+  /**
+   * Server password stored
+   */
+  200: boolean
+}
+
+export type GitWorkspaceServerPasswordSetResponse =
+  GitWorkspaceServerPasswordSetResponses[keyof GitWorkspaceServerPasswordSetResponses]
+
 export type EventSubscribeData = {
   body?: never
   path?: never

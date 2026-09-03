@@ -16,6 +16,8 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { Format } from "@/format"
 import { Git } from "@/git"
 import { node as RemoteGitNode } from "@/git/remote"
+import { node as CodespacesNode } from "@/git/codespaces"
+import { node as WorkspaceSecretNode } from "@/control-plane/workspace-secret"
 import { Installation } from "@/installation"
 import { LSP } from "@/lsp/lsp"
 import { MCP } from "@/mcp"
@@ -221,6 +223,8 @@ const app = LayerNode.group([
   Env.node,
   Git.node,
   RemoteGitNode,
+  CodespacesNode,
+  WorkspaceSecretNode,
   Ripgrep.node,
   Storage.node,
   Snapshot.node,

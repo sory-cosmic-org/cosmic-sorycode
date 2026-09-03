@@ -78,6 +78,24 @@ import type {
   FormatterStatusResponses,
   GitBranchesListErrors,
   GitBranchesListResponses,
+  GitCodespacesCreateErrors,
+  GitCodespacesCreateResponses,
+  GitCodespacesDeleteErrors,
+  GitCodespacesDeleteResponses,
+  GitCodespacesDevcontainersListErrors,
+  GitCodespacesDevcontainersListResponses,
+  GitCodespacesGetErrors,
+  GitCodespacesGetResponses,
+  GitCodespacesListByRepositoryErrors,
+  GitCodespacesListByRepositoryResponses,
+  GitCodespacesListErrors,
+  GitCodespacesListResponses,
+  GitCodespacesMachinesListErrors,
+  GitCodespacesMachinesListResponses,
+  GitCodespacesStartErrors,
+  GitCodespacesStartResponses,
+  GitCodespacesStopErrors,
+  GitCodespacesStopResponses,
   GitConnectErrors,
   GitConnectResponses,
   GitDisconnectErrors,
@@ -90,6 +108,12 @@ import type {
   GitRepositoriesListResponses,
   GitStatusGetErrors,
   GitStatusGetResponses,
+  GitTokenScopesGetErrors,
+  GitTokenScopesGetResponses,
+  GitWorkspaceServerPasswordGetErrors,
+  GitWorkspaceServerPasswordGetResponses,
+  GitWorkspaceServerPasswordSetErrors,
+  GitWorkspaceServerPasswordSetResponses,
   GlobalConfigGetErrors,
   GlobalConfigGetResponses,
   GlobalConfigUpdateErrors,
@@ -1546,6 +1570,355 @@ export class Status extends HeyApiClient {
   }
 }
 
+export class Machines extends HeyApiClient {
+  /**
+   * List available machines
+   *
+   * List machine types available for new codespaces in a repository.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      owner: string
+      repository: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "owner" },
+            { in: "path", key: "repository" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      GitCodespacesMachinesListResponses,
+      GitCodespacesMachinesListErrors,
+      ThrowOnError
+    >({
+      url: "/git/repositories/{owner}/{repository}/codespaces/machines",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Devcontainers extends HeyApiClient {
+  /**
+   * List devcontainer configurations
+   *
+   * List devcontainer.json configurations available for new codespaces.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters: {
+      owner: string
+      repository: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "owner" },
+            { in: "path", key: "repository" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      GitCodespacesDevcontainersListResponses,
+      GitCodespacesDevcontainersListErrors,
+      ThrowOnError
+    >({
+      url: "/git/repositories/{owner}/{repository}/codespaces/devcontainers",
+      ...options,
+      ...params,
+    })
+  }
+}
+
+export class Codespaces extends HeyApiClient {
+  /**
+   * List GitHub Codespaces
+   *
+   * List the authenticated user's codespaces, optionally filtered by repository.
+   */
+  public list<ThrowOnError extends boolean = false>(
+    parameters?: {
+      repositoryID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "query", key: "repositoryID" }] }])
+    return (options?.client ?? this.client).get<GitCodespacesListResponses, GitCodespacesListErrors, ThrowOnError>({
+      url: "/git/codespaces",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * List codespaces for a repository
+   *
+   * List the authenticated user's codespaces for one repository.
+   */
+  public listByRepository<ThrowOnError extends boolean = false>(
+    parameters: {
+      owner: string
+      repository: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "owner" },
+            { in: "path", key: "repository" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      GitCodespacesListByRepositoryResponses,
+      GitCodespacesListByRepositoryErrors,
+      ThrowOnError
+    >({
+      url: "/git/repositories/{owner}/{repository}/codespaces",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Create a codespace
+   *
+   * Create a real GitHub Codespace for a repository branch. Creation continues on GitHub; poll get for the state.
+   */
+  public create<ThrowOnError extends boolean = false>(
+    parameters: {
+      owner: string
+      repository: string
+      branch?: string
+      machine?: string
+      devcontainerPath?: string
+      displayName?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "owner" },
+            { in: "path", key: "repository" },
+            { in: "body", key: "branch" },
+            { in: "body", key: "machine" },
+            { in: "body", key: "devcontainerPath" },
+            { in: "body", key: "displayName" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<GitCodespacesCreateResponses, GitCodespacesCreateErrors, ThrowOnError>(
+      {
+        url: "/git/repositories/{owner}/{repository}/codespaces",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  /**
+   * Delete a codespace
+   *
+   * Explicitly delete a codespace. This cannot be undone.
+   */
+  public delete<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "name" }] }])
+    return (options?.client ?? this.client).delete<
+      GitCodespacesDeleteResponses,
+      GitCodespacesDeleteErrors,
+      ThrowOnError
+    >({
+      url: "/git/codespaces/{name}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Get a codespace
+   *
+   * Get the real state of one codespace by name.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "name" }] }])
+    return (options?.client ?? this.client).get<GitCodespacesGetResponses, GitCodespacesGetErrors, ThrowOnError>({
+      url: "/git/codespaces/{name}",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Start a codespace
+   *
+   * Start a stopped codespace.
+   */
+  public start<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "name" }] }])
+    return (options?.client ?? this.client).post<GitCodespacesStartResponses, GitCodespacesStartErrors, ThrowOnError>({
+      url: "/git/codespaces/{name}/start",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Stop a codespace
+   *
+   * Stop a running codespace without deleting it.
+   */
+  public stop<ThrowOnError extends boolean = false>(
+    parameters: {
+      name: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "name" }] }])
+    return (options?.client ?? this.client).post<GitCodespacesStopResponses, GitCodespacesStopErrors, ThrowOnError>({
+      url: "/git/codespaces/{name}/stop",
+      ...options,
+      ...params,
+    })
+  }
+
+  private _machines?: Machines
+  get machines(): Machines {
+    return (this._machines ??= new Machines({ client: this.client }))
+  }
+
+  private _devcontainers?: Devcontainers
+  get devcontainers(): Devcontainers {
+    return (this._devcontainers ??= new Devcontainers({ client: this.client }))
+  }
+}
+
+export class TokenScopes extends HeyApiClient {
+  /**
+   * Get stored token scopes
+   *
+   * List classic PAT scopes of the stored GitHub token, to warn when the codespace scope is missing.
+   */
+  public get<ThrowOnError extends boolean = false>(options?: Options<never, ThrowOnError>) {
+    return (options?.client ?? this.client).get<GitTokenScopesGetResponses, GitTokenScopesGetErrors, ThrowOnError>({
+      url: "/git/token-scopes",
+      ...options,
+    })
+  }
+}
+
+export class ServerPassword extends HeyApiClient {
+  /**
+   * Check a workspace server password
+   *
+   * Check whether a remote server password is stored, without ever returning it.
+   */
+  public get<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams([parameters], [{ args: [{ in: "path", key: "id" }] }])
+    return (options?.client ?? this.client).get<
+      GitWorkspaceServerPasswordGetResponses,
+      GitWorkspaceServerPasswordGetErrors,
+      ThrowOnError
+    >({
+      url: "/git/workspaces/{id}/server-password",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Set a workspace remote server password
+   *
+   * Store the remote OpenCode server password for a workspace. Same value as the SORY_CODE_SERVER_PASSWORD codespace secret. Never returned.
+   */
+  public set<ThrowOnError extends boolean = false>(
+    parameters: {
+      id: string
+      workspaceID?: string
+      password?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "id" },
+            { in: "body", key: "workspaceID" },
+            { in: "body", key: "password" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      GitWorkspaceServerPasswordSetResponses,
+      GitWorkspaceServerPasswordSetErrors,
+      ThrowOnError
+    >({
+      url: "/git/workspaces/{id}/server-password",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+}
+
+export class Workspace2 extends HeyApiClient {
+  private _serverPassword?: ServerPassword
+  get serverPassword(): ServerPassword {
+    return (this._serverPassword ??= new ServerPassword({ client: this.client }))
+  }
+}
+
 export class Git extends HeyApiClient {
   /**
    * Connect GitHub with a token
@@ -1606,6 +1979,21 @@ export class Git extends HeyApiClient {
   private _status?: Status
   get status(): Status {
     return (this._status ??= new Status({ client: this.client }))
+  }
+
+  private _codespaces?: Codespaces
+  get codespaces(): Codespaces {
+    return (this._codespaces ??= new Codespaces({ client: this.client }))
+  }
+
+  private _tokenScopes?: TokenScopes
+  get tokenScopes(): TokenScopes {
+    return (this._tokenScopes ??= new TokenScopes({ client: this.client }))
+  }
+
+  private _workspace?: Workspace2
+  get workspace(): Workspace2 {
+    return (this._workspace ??= new Workspace2({ client: this.client }))
   }
 }
 
