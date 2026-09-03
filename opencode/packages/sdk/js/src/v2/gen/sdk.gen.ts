@@ -395,12 +395,16 @@ import type {
   V2SkillListResponses,
   VcsApplyErrors,
   VcsApplyResponses,
+  VcsBranchErrors,
+  VcsBranchResponses,
   VcsCommitErrors,
   VcsCommitResponses,
   VcsDiffErrors,
   VcsDiffRawErrors,
   VcsDiffRawResponses,
   VcsDiffResponses,
+  VcsFetchErrors,
+  VcsFetchResponses,
   VcsGetErrors,
   VcsGetResponses,
   VcsPushErrors,
@@ -2376,6 +2380,75 @@ export class Vcs extends HeyApiClient {
       url: "/vcs/push",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Fetch VCS remote
+   *
+   * Fetch the configured Git remote without changing the working tree.
+   */
+  public fetch<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<VcsFetchResponses, VcsFetchErrors, ThrowOnError>({
+      url: "/vcs/fetch",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Switch VCS branch
+   *
+   * Switch the current branch or create it in the current workspace.
+   */
+  public branch<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      name?: string
+      create?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "name" },
+            { in: "body", key: "create" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<VcsBranchResponses, VcsBranchErrors, ThrowOnError>({
+      url: "/vcs/branch",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

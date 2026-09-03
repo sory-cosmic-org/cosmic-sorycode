@@ -327,6 +327,46 @@ confirment les succès ou affichent les erreurs, et le diff est invalidé après
 mutation. Le dépôt propre reste visible via l’état existant « No uncommitted
 changes yet » et désactive Commit. Les textes ajoutés passent par l’i18n.
 
+#### Étape 1C — Fetch et changement de branche
+
+**Objectif avant implémentation :** permettre `fetch` du remote et
+changement/création de branche dans le workspace distant, sans exposer de
+credential et sans toucher à l’arbre de travail pour `fetch`.
+
+**Périmètre prévu :**
+
+- réutiliser `Git.run` et l’autorisation HTTP existante ;
+- `fetch` vers `origin` (ou premier remote), sans modifier le working tree ;
+- `branch` avec validation stricte du nom côté serveur (`..`, espaces et
+  caractères refusés par Git rejetés avant tout appel shell) ;
+- création via `checkout -b`, switch via `checkout`, jamais `-B`/`-f` ;
+- mise à jour du cache de branche et publication `BranchUpdated` après switch ;
+- régénérer les clients officiels, sans édition manuelle de `generated` ;
+- exposer Fetch + Branch dans le panneau Review existant avec dialogue,
+  toasts et i18n ;
+- ne pas encore ajouter Pull Request, pipeline ou GitLab.
+
+**Critères de fin :**
+
+- les opérations s’exécutent dans le workspace sélectionné, jamais dans le
+  dépôt parent ;
+- les erreurs sont explicites et sans sortie Git sensible ;
+- les tests VCS ciblés, les tests HTTP instance et l’app typecheck passent ;
+- cette section est mise à jour avant la prochaine étape Git/CI.
+
+**Résultat :** terminée côté serveur et interface. `Vcs.fetch` et
+`Vcs.switchBranch` ajoutés avec schémas typés (`FetchResult`,
+`BranchInput`, `BranchResult`), routes `POST /vcs/fetch` et
+`POST /vcs/branch`, erreurs `VcsOperationError` étendues (`fetch`,
+`branch`). Vérifié en direct sur serveur temporaire : fetch vers remote
+local, création/switch de branche, rejet `../bad` en `400` sans fuite.
+Clients V2 régénérés (`sdk.gen.ts`, `types.gen.ts` limités aux nouveaux
+endpoints). Le panneau Review expose Fetch et Branch (dialogue nom +
+case « Create new branch »), rafraîchit le diff après mutation. Tests :
+`vcs.test.ts` 20 pass, HTTP instance/control-plane/global 15 pass, app
+typecheck OK, unit app 723 pass / 1 fail (parité i18n déjà en échec avant
+cette étape, dette de 1B : clés anglaises sans traductions).
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :

@@ -45,7 +45,7 @@ export class ApiVcsOperationError extends Schema.ErrorClass<ApiVcsOperationError
     name: Schema.Literal("VcsOperationError"),
     data: Schema.Struct({
       message: Schema.String,
-      action: Schema.Literals(["commit", "push"]),
+      action: Schema.Literals(["commit", "push", "fetch", "branch"]),
       reason: Schema.Literals(["non-git", "nothing-to-commit", "no-remote", "failed"]),
     }),
   },
@@ -62,6 +62,8 @@ export const InstancePaths = {
   vcsApply: "/vcs/apply",
   vcsCommit: "/vcs/commit",
   vcsPush: "/vcs/push",
+  vcsFetch: "/vcs/fetch",
+  vcsBranch: "/vcs/branch",
   command: "/command",
   agent: "/agent",
   skill: "/skill",
@@ -171,6 +173,29 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "vcs.push",
             summary: "Push VCS changes",
             description: "Push the current branch to its configured Git remote.",
+          }),
+        ),
+        HttpApiEndpoint.post("vcsFetch", InstancePaths.vcsFetch, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.FetchResult, "VCS remote fetched"),
+          error: ApiVcsOperationError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "vcs.fetch",
+            summary: "Fetch VCS remote",
+            description: "Fetch the configured Git remote without changing the working tree.",
+          }),
+        ),
+        HttpApiEndpoint.post("vcsBranch", InstancePaths.vcsBranch, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.BranchInput,
+          success: described(Vcs.BranchResult, "VCS branch switched"),
+          error: ApiVcsOperationError,
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "vcs.branch",
+            summary: "Switch VCS branch",
+            description: "Switch the current branch or create it in the current workspace.",
           }),
         ),
         HttpApiEndpoint.get("command", InstancePaths.command, {

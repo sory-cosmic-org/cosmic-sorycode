@@ -1,6 +1,7 @@
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { createSignal } from "solid-js"
+import { DialogVcsBranch } from "@/components/dialog-vcs-branch"
 import { DialogVcsCommit } from "@/components/dialog-vcs-commit"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
@@ -23,7 +24,7 @@ export function SessionGitActions(props: { hasChanges: () => boolean; onRefresh:
   const dialog = useDialog()
   const sdk = useSDK()
   const serverSDK = useServerSDK()
-  const [busy, setBusy] = createSignal<"commit" | "push">()
+  const [busy, setBusy] = createSignal<"commit" | "push" | "fetch" | "branch">()
 
   const commit = async (message: string) => {
     if (busy()) throw new Error(language.t("session.review.git.busy"))
@@ -74,6 +75,53 @@ export function SessionGitActions(props: { hasChanges: () => boolean; onRefresh:
     void dialog.show(() => <DialogVcsCommit onCommit={commit} />)
   }
 
+  const fetch = async () => {
+    if (busy()) return
+    setBusy("fetch")
+    try {
+      const result = await serverSDK().createClient({ directory: sdk().directory }).vcs.fetch()
+      if (result.error) throw new Error(vcsErrorMessage(result.error, language.t("common.requestFailed")))
+      if (!result.data) throw new Error(language.t("common.requestFailed"))
+      showToast({
+        variant: "success",
+        title: language.t("session.review.git.fetchSuccess"),
+        description: result.data.remote,
+      })
+      props.onRefresh()
+    } catch (error) {
+      showToast({
+        variant: "error",
+        title: language.t("common.requestFailed"),
+        description: vcsErrorMessage(error, language.t("common.requestFailed")),
+      })
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  const switchBranch = async (name: string, create: boolean) => {
+    if (busy()) throw new Error(language.t("session.review.git.busy"))
+    setBusy("branch")
+    try {
+      const result = await serverSDK().createClient({ directory: sdk().directory }).vcs.branch({ name, create })
+      if (result.error) throw new Error(vcsErrorMessage(result.error, language.t("common.requestFailed")))
+      if (!result.data) throw new Error(language.t("common.requestFailed"))
+      showToast({
+        variant: "success",
+        title: language.t("session.review.git.branchSuccess"),
+        description: result.data.branch,
+      })
+      props.onRefresh()
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  const openBranch = () => {
+    if (busy()) return
+    void dialog.show(() => <DialogVcsBranch onSwitch={switchBranch} />)
+  }
+
   return (
     <div class="flex items-center gap-1">
       <ButtonV2
@@ -97,6 +145,28 @@ export function SessionGitActions(props: { hasChanges: () => boolean; onRefresh:
         onClick={() => void push()}
       >
         {busy() === "push" ? language.t("session.review.git.pushLoading") : language.t("session.review.git.push")}
+      </ButtonV2>
+      <ButtonV2
+        size="small"
+        variant="ghost"
+        icon="status"
+        disabled={!!busy()}
+        title={language.t("session.review.git.fetch")}
+        aria-label={language.t("session.review.git.fetch")}
+        onClick={() => void fetch()}
+      >
+        {busy() === "fetch" ? language.t("session.review.git.fetchLoading") : language.t("session.review.git.fetch")}
+      </ButtonV2>
+      <ButtonV2
+        size="small"
+        variant="ghost"
+        icon="branch"
+        disabled={!!busy()}
+        title={language.t("session.review.git.branch")}
+        aria-label={language.t("session.review.git.branch")}
+        onClick={openBranch}
+      >
+        {busy() === "branch" ? language.t("session.review.git.branchLoading") : language.t("session.review.git.branch")}
       </ButtonV2>
     </div>
   )

@@ -105,6 +105,38 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       )
     })
 
+    const fetchVcs = Effect.fn("InstanceHttpApi.vcsFetch")(function* () {
+      return yield* vcs.fetch().pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: {
+                message: error.message,
+                action: error.action,
+                reason: error.reason,
+              },
+            }),
+        ),
+      )
+    })
+
+    const branchVcs = Effect.fn("InstanceHttpApi.vcsBranch")(function* (ctx: { payload: Vcs.BranchInput }) {
+      return yield* vcs.switchBranch(ctx.payload).pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: {
+                message: error.message,
+                action: error.action,
+                reason: error.reason,
+              },
+            }),
+        ),
+      )
+    })
+
     const getCommand = Effect.fn("InstanceHttpApi.command")(function* () {
       return yield* command.list()
     })
@@ -135,6 +167,8 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("vcsApply", applyVcs)
       .handle("vcsCommit", commitVcs)
       .handle("vcsPush", pushVcs)
+      .handle("vcsFetch", fetchVcs)
+      .handle("vcsBranch", branchVcs)
       .handle("command", getCommand)
       .handle("agent", getAgent)
       .handle("skill", getSkill)

@@ -408,4 +408,71 @@ describe("Vcs operations", () => {
       }),
     { git: true },
   )
+
+  it.instance(
+    "fetches the configured remote without touching the working tree",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const remote = yield* tmpdirScoped()
+        yield* git(remote, ["init", "--bare"])
+        yield* git(test.directory, ["remote", "add", "origin", remote])
+        yield* write(path.join(test.directory, "fetched.txt"), "fetched\n")
+
+        const vcs = yield* init()
+        yield* vcs.commit({ message: "fetch changes" })
+        const result = yield* vcs.fetch()
+
+        expect(result).toEqual({ fetched: true, remote: "origin" })
+        expect(yield* vcs.status()).toEqual([])
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "rejects a fetch when no remote is configured",
+    () =>
+      Effect.gen(function* () {
+        const vcs = yield* init()
+        const exit = yield* Effect.exit(vcs.fetch())
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(String(exit)).toContain("No Git remote is configured")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "creates and switches branches",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const vcs = yield* init()
+        const created = yield* vcs.switchBranch({ name: "feature/fetch-branch", create: true })
+        const current = yield* Git.Service.use((service) => service.branch(test.directory))
+
+        expect(created).toEqual({ switched: true, branch: "feature/fetch-branch" })
+        expect(current).toBe("feature/fetch-branch")
+        expect(yield* vcs.branch()).toBe("feature/fetch-branch")
+
+        yield* git(test.directory, ["checkout", "-"])
+        const switched = yield* vcs.switchBranch({ name: "feature/fetch-branch" })
+
+        expect(switched).toEqual({ switched: true, branch: "feature/fetch-branch" })
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "rejects dangerous branch names without touching git",
+    () =>
+      Effect.gen(function* () {
+        const vcs = yield* init()
+        const exit = yield* Effect.exit(vcs.switchBranch({ name: "../outside" }))
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(String(exit)).toContain("Invalid branch name")
+      }),
+    { git: true },
+  )
 })

@@ -2349,7 +2349,7 @@ export type VcsOperationError = {
   name: "VcsOperationError"
   data: {
     message: string
-    action: "commit" | "push"
+    action: "commit" | "push" | "fetch" | "branch"
     reason: "non-git" | "nothing-to-commit" | "no-remote" | "failed"
   }
 }
@@ -8544,6 +8544,71 @@ export type VcsPushResponses = {
 }
 
 export type VcsPushResponse = VcsPushResponses[keyof VcsPushResponses]
+
+export type VcsFetchData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/fetch"
+}
+
+export type VcsFetchErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type VcsFetchError = VcsFetchErrors[keyof VcsFetchErrors]
+
+export type VcsFetchResponses = {
+  /**
+   * VCS remote fetched
+   */
+  200: {
+    fetched: true
+    remote: string
+  }
+}
+
+export type VcsFetchResponse = VcsFetchResponses[keyof VcsFetchResponses]
+
+export type VcsBranchData = {
+  body?: {
+    name: string
+    create?: boolean
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/branch"
+}
+
+export type VcsBranchErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type VcsBranchError = VcsBranchErrors[keyof VcsBranchErrors]
+
+export type VcsBranchResponses = {
+  /**
+   * VCS branch switched
+   */
+  200: {
+    switched: true
+    branch: string
+  }
+}
+
+export type VcsBranchResponse = VcsBranchResponses[keyof VcsBranchResponses]
 
 export type CommandListData = {
   body?: never

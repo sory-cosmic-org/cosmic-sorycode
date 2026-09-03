@@ -235,6 +235,17 @@ const track = Effect.fnUntraced(function* (
 export const Mode = Schema.Literals(["git", "branch"])
 export type Mode = Schema.Schema.Type<typeof Mode>
 
+// Conservative subset of `git check-ref-format`: reject empty names,
+// whitespace, parent-directory escapes and characters git refuses in refs.
+// Never shell out for validation so untrusted input stays out of the shell.
+const isValidBranchName = (name: string) => {
+  if (!/\S/.test(name)) return false
+  if (name.includes("..") || name.includes(" ")) return false
+  if (/[\x00-\x20~^:?*\[\\]/.test(name)) return false
+  if (name.startsWith("-") || name.startsWith("/") || name.endsWith("/") || name.endsWith(".lock")) return false
+  return true
+}
+
 export const Event = VcsEvent
 
 export const Info = Schema.Struct({
@@ -297,9 +308,27 @@ export const PushResult = Schema.Struct({
 })
 export type PushResult = Schema.Schema.Type<typeof PushResult>
 
+export const FetchResult = Schema.Struct({
+  fetched: Schema.Literal(true),
+  remote: Schema.String,
+})
+export type FetchResult = Schema.Schema.Type<typeof FetchResult>
+
+export const BranchInput = Schema.Struct({
+  name: Schema.String.check(Schema.isPattern(/\S/)),
+  create: Schema.optional(Schema.Boolean),
+})
+export type BranchInput = Schema.Schema.Type<typeof BranchInput>
+
+export const BranchResult = Schema.Struct({
+  switched: Schema.Literal(true),
+  branch: Schema.String,
+})
+export type BranchResult = Schema.Schema.Type<typeof BranchResult>
+
 export class OperationError extends Schema.TaggedErrorClass<OperationError>()("VcsOperationError", {
   message: Schema.String,
-  action: Schema.Literals(["commit", "push"]),
+  action: Schema.Literals(["commit", "push", "fetch", "branch"]),
   reason: Schema.Literals(["non-git", "nothing-to-commit", "no-remote", "failed"]),
 }) {}
 
@@ -313,6 +342,8 @@ export interface Interface {
   readonly apply: (input: ApplyInput) => Effect.Effect<ApplyResult, PatchApplyError>
   readonly commit: (input: CommitInput) => Effect.Effect<CommitResult, OperationError>
   readonly push: () => Effect.Effect<PushResult, OperationError>
+  readonly fetch: () => Effect.Effect<FetchResult, OperationError>
+  readonly switchBranch: (input: BranchInput) => Effect.Effect<BranchResult, OperationError>
 }
 
 interface State {
@@ -527,6 +558,76 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         }
 
         return { pushed: true, branch, remote }
+      }),
+      fetch: Effect.fn("Vcs.fetch")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") {
+          return yield* new OperationError({
+            message: "Fetch can't run because the project is not git-based",
+            action: "fetch",
+            reason: "non-git",
+          })
+        }
+
+        const remotes = (yield* git.run(["remote"], { cwd: ctx.directory })).text().split(/\r?\n/).filter(Boolean)
+        const remote = remotes.includes("origin") ? "origin" : remotes[0]
+        if (!remote) {
+          return yield* new OperationError({
+            message: "No Git remote is configured",
+            action: "fetch",
+            reason: "no-remote",
+          })
+        }
+
+        const fetched = yield* git.run(["fetch", remote], {
+          cwd: ctx.directory,
+          maxOutputBytes: 32_768,
+        })
+        if (fetched.exitCode !== 0) {
+          return yield* new OperationError({
+            message: "Git fetch failed",
+            action: "fetch",
+            reason: "failed",
+          })
+        }
+
+        return { fetched: true, remote }
+      }),
+      switchBranch: Effect.fn("Vcs.switchBranch")(function* (input: BranchInput) {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") {
+          return yield* new OperationError({
+            message: "Branch switch can't run because the project is not git-based",
+            action: "branch",
+            reason: "non-git",
+          })
+        }
+
+        const name = input.name.trim()
+        if (!isValidBranchName(name)) {
+          return yield* new OperationError({
+            message: "Invalid branch name",
+            action: "branch",
+            reason: "failed",
+          })
+        }
+
+        const args = input.create ? ["checkout", "-b", name] : ["checkout", name]
+        const switched = yield* git.run(args, { cwd: ctx.directory, maxOutputBytes: 32_768 })
+        if (switched.exitCode !== 0) {
+          return yield* new OperationError({
+            message: input.create ? "Git could not create the branch" : "Git could not switch branches",
+            action: "branch",
+            reason: "failed",
+          })
+        }
+
+        const branch = (yield* git.branch(ctx.directory)) ?? name
+        yield* InstanceState.use(state, (value) => {
+          value.current = branch
+        })
+        yield* events.publish(Event.BranchUpdated, { branch })
+        return { switched: true, branch }
       }),
     })
   }),
