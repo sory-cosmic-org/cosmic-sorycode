@@ -367,6 +367,54 @@ case « Create new branch »), rafraîchit le diff après mutation. Tests :
 typecheck OK, unit app 723 pass / 1 fail (parité i18n déjà en échec avant
 cette étape, dette de 1B : clés anglaises sans traductions).
 
+#### Étape 2 — Statut lifecycle persisté des workspaces (plan-adoption §15-16)
+
+**Objectif avant implémentation :** donner aux workspaces un état réel
+persisté (`creating` → `running` / `error`), au lieu du seul statut de
+connexion éphémère en mémoire. Première brique de la persistance
+provider-par-projet : sans état durable, aucun retour automatique sur
+l’environnement du projet n’est possible.
+
+**Périmètre prévu :**
+
+- ajouter la colonne `status` à la table `workspace` via le pipeline
+  officiel (`bun run migration --name ...` depuis `packages/core`), sans
+  migration écrite à la main ;
+- `creating` à l’insertion, `running` après `adapter.create` réussi ;
+- échec de création : comportement existant conservé (dossier partiel et
+  ligne supprimés, couvert par les tests) ;
+- `error` uniquement pour un workspace existant dont la cible ne se résout
+  plus (remote injoignable, dossier local disparu) ;
+- réconciliation au démarrage : une ligne restée `creating` après un crash
+  repasse à `running`/`error` selon la cible réelle ;
+- jamais d’état simulé : pas de `stopped` tant qu’aucun mécanisme d’arrêt
+  n’existe, `destroyed` = ligne supprimée par `remove` ;
+- exposer le statut dans `Workspace.Info` (`list`/`get`/`create`) ;
+- régénérer le SDK V2 officiel, sans édition manuelle ;
+- ne pas encore toucher l’UI (affichage statut + drawer mobile = prochaine
+  unité) ni ajouter de provider.
+
+**Critères de fin :**
+
+- `bun run migration --check` ne signale aucun changement restant ;
+- les tests workspace ciblent les transitions (`create` → `running`,
+  dossier manquant → `error`) ;
+- les tests existants mis à jour restent verts ;
+- cette section est mise à jour avant l’unité suivante.
+
+**Résultat :** terminée côté serveur. Migration
+`20260903101812_workspace_status` générée officiellement (`status text
+DEFAULT 'running' NOT NULL`, existants conservés en `running`),
+`schema.gen.ts`/`migration.gen.ts`/`schema.json` régénérés, `--check`
+propre. `Workspace.create` insère `creating` puis retourne `running`,
+`startSync` persiste `error` si la cible échoue et réconcilie les lignes
+abandonnées. `Workspace.Info` expose `status`, SDK V2 régénéré (diff
+d’une ligne). Tests : `workspace.test.ts` 37 pass (helpers + attentes
+mis à jour, 1 nouveau test `error`), `remote-github-adapter` 5 pass,
+HTTP workspace/control-plane 10 pass, `core typecheck` OK. Prochaine
+unité : affichage du statut + drawer Fichiers mobile, puis pointeur
+provider-par-projet et `LocalProvider` aligné sur `worktree`.
+
 ### Installer les dépendances
 
 À la première utilisation, ou après une mise à jour du dépôt :

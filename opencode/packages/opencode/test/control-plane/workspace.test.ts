@@ -277,6 +277,7 @@ function workspaceInfo(projectID: ProjectV2.ID, type: string, input?: Partial<Wo
     directory: input?.directory ?? null,
     extra: input?.extra ?? null,
     projectID,
+    status: input?.status ?? "running",
     timeUsed: input?.timeUsed ?? Date.now(),
   }
 }
@@ -293,6 +294,7 @@ function insertWorkspace(info: Workspace.Info) {
         directory: info.directory,
         extra: info.extra,
         project_id: info.projectID,
+        status: info.status,
         time_used: info.timeUsed,
       })
       .run()
@@ -482,6 +484,7 @@ describe("workspace CRUD", () => {
           directory: targetDir,
           extra: { configured: true },
           projectID: instance.project.id,
+          status: "running",
           timeUsed: info.timeUsed,
         })
         expect(yield* workspace.get(workspaceID)).toEqual(info)
@@ -515,8 +518,35 @@ describe("workspace CRUD", () => {
   )
 
   it.instance(
-    "create propagates configure failures and does not insert a workspace",
+    "create marks the workspace error when its local directory is missing",
     () =>
+      Effect.gen(function* () {
+        const instance = yield* requireInstance
+        const workspace = yield* Workspace.Service
+        const workspaceID = WorkspaceV2.ID.ascending("wrk_create_missing")
+        const type = unique("create-missing")
+        const targetDir = path.join(instance.directory, "missing-local")
+        registerAdapter(instance.project.id, type, localAdapter(targetDir, { createDir: false }).adapter)
+
+        const info = yield* workspace.create({
+          id: workspaceID,
+          type,
+          branch: null,
+          projectID: instance.project.id,
+          extra: null,
+        })
+
+        expect(info.status).toBe("running")
+        expect((yield* workspace.get(workspaceID))?.status).toBe("error")
+        expect(yield* workspace.list(instance.project)).toEqual([
+          expect.objectContaining({ id: workspaceID, status: "error" }),
+        ])
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "create propagates configure failures and does not insert a workspace",    () =>
       Effect.gen(function* () {
         const instance = yield* requireInstance
         const workspace = yield* Workspace.Service

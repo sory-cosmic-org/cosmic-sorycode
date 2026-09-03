@@ -37,9 +37,10 @@ import { WorkspaceEvent } from "@opencode-ai/schema/workspace-event"
 
 export const Info = Schema.Struct({
   ...WorkspaceInfoSchema.fields,
+  status: Schema.Literals(["creating", "running", "error", "stopped"]),
   timeUsed: Schema.Number,
 }).annotate({ identifier: "Workspace" })
-export type Info = WorkspaceInfo & { timeUsed: number }
+export type Info = WorkspaceInfo & { status: "creating" | "running" | "error" | "stopped"; timeUsed: number }
 
 export const ConnectionStatus = WorkspaceEvent.ConnectionStatus
 export type ConnectionStatus = WorkspaceEvent.ConnectionStatus
@@ -55,6 +56,9 @@ function fromRow(row: typeof WorkspaceTable.$inferSelect): Info {
     directory: row.directory,
     extra: row.extra,
     projectID: row.project_id,
+    status: row.status === "creating" || row.status === "running" || row.status === "error" || row.status === "stopped"
+      ? row.status
+      : "running",
     timeUsed: row.time_used,
   }
 }
@@ -180,6 +184,16 @@ const layer = Layer.effect(
         },
       })
     }
+
+    // Persisted lifecycle axis (creating/running/error/stopped), distinct
+    // from the ephemeral connection axis above. Only transitions the
+    // service can verify itself: provisioned, reachable target, failure.
+    const setLifecycle = Effect.fn("Workspace.setLifecycle")(function* (
+      id: WorkspaceV2.ID,
+      status: Info["status"],
+    ) {
+      yield* db.update(WorkspaceTable).set({ status }).where(eq(WorkspaceTable.id, id)).run().pipe(Effect.orDie)
+    })
 
     const connectSSE = Effect.fn("Workspace.connectSSE")(function* (
       url: URL | string,
@@ -445,6 +459,7 @@ const layer = Layer.effect(
         Effect.catch((error) =>
           Effect.gen(function* () {
             setStatus(space.id, "error")
+            yield* setLifecycle(space.id, "error")
             yield* Effect.logWarning("workspace target failed", {
               workspaceID: space.id,
               error: errorData(error),
@@ -456,9 +471,16 @@ const layer = Layer.effect(
       if (!target) return
 
       if (target.type === "local") {
-        setStatus(space.id, (yield* fs.existsSafe(target.directory)) ? "connected" : "error")
+        const exists = yield* fs.existsSafe(target.directory)
+        setStatus(space.id, exists ? "connected" : "error")
+        // Reconcile rows left behind by a crash (e.g. stuck "creating")
+        // or whose directory vanished since.
+        if (space.status !== (exists ? "running" : "error")) yield* setLifecycle(space.id, exists ? "running" : "error")
         return
       }
+
+      // Remote target resolved: provisioned, even before the sync loop connects.
+      if (space.status !== "running") yield* setLifecycle(space.id, "running")
 
       const exists = yield* FiberMap.has(syncFibers, space.id)
       if (exists && connections.get(space.id)?.status !== "error") return
@@ -508,6 +530,7 @@ const layer = Layer.effect(
         directory: config.directory ?? null,
         extra: config.extra ?? null,
         projectID: input.projectID,
+        status: "creating",
         timeUsed: Date.now(),
       }
 
@@ -521,6 +544,7 @@ const layer = Layer.effect(
           directory: info.directory,
           extra: info.extra,
           project_id: info.projectID,
+          status: info.status,
           time_used: info.timeUsed,
         })
         .run()
@@ -551,24 +575,30 @@ const layer = Layer.effect(
           }),
         ),
       )
+      // Provisioning succeeded: the workspace exists even if the follow-up
+      // connection does not. A failed create keeps the previous behavior
+      // (partial files and row removed) so "error" below only marks
+      // workspaces that exist but whose target cannot be resolved.
+      yield* setLifecycle(info.id, "running")
+      const created: Info = { ...info, status: "running" }
       yield* Effect.all(
         [
           waitEvent({
             timeout: TIMEOUT,
             fn(event) {
-              if (event.workspace === info.id && event.payload.type === Event.Status.type) {
+              if (event.workspace === created.id && event.payload.type === Event.Status.type) {
                 const { status } = event.payload.properties
                 return status === "error" || status === "connected"
               }
               return false
             },
           }),
-          startSync(info),
+          startSync(created),
         ],
         { concurrency: 2, discard: true },
       )
 
-      return info
+      return created
     })
 
     const sessionWarp = Effect.fn("Workspace.sessionWarp")(function* (input: SessionWarpInput) {
@@ -768,6 +798,7 @@ const layer = Layer.effect(
               directory: item.directory,
               extra: item.extra,
               projectID: item.projectID,
+              status: "running",
               timeUsed: Date.now(),
             }
 
@@ -781,6 +812,7 @@ const layer = Layer.effect(
                 directory: info.directory,
                 extra: info.extra,
                 project_id: info.projectID,
+                status: info.status,
                 time_used: info.timeUsed,
               })
               .run()

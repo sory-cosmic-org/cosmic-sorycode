@@ -2678,6 +2678,7 @@ export type Workspace = {
   directory?: string | null
   extra?: unknown | null
   projectID: string
+  status: "creating" | "running" | "error" | "stopped"
   timeUsed: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
 }
 

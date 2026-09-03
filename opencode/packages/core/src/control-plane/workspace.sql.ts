@@ -14,6 +14,7 @@ export const WorkspaceTable = sqliteTable("workspace", {
     .$type<ProjectV2.ID>()
     .notNull()
     .references(() => ProjectTable.id, { onDelete: "cascade" }),
+  status: text().notNull().default("running"),
   time_used: integer()
     .notNull()
     .$default(() => Date.now()),
